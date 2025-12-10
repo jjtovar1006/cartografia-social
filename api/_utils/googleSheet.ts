@@ -29,7 +29,6 @@ export const fetchFromScript = async (params: Record<string, any>, method: 'GET'
       bodyData = JSON.stringify(params);
       requestOptions.headers = {
         ...requestOptions.headers,
-        // Explicitly use Buffer from imported module
         'Content-Length': Buffer.byteLength(bodyData)
       };
     }
@@ -37,15 +36,14 @@ export const fetchFromScript = async (params: Record<string, any>, method: 'GET'
     const makeRequest = (currentOptions: https.RequestOptions, postBody?: string) => {
       const req = https.request(currentOptions, (res: IncomingMessage) => {
         // Handle Google Apps Script Redirects (302)
-        // When a script returns output, Google redirects to a temporary URL serving the content
         if (res.statusCode === 302 && res.headers.location) {
-          const newUrl = new URL(res.headers.location);
+          const location = Array.isArray(res.headers.location) ? res.headers.location[0] : res.headers.location;
+          const newUrl = new URL(location);
           const newOptions: https.RequestOptions = {
             method: 'GET', // Follow redirect with GET to retrieve the output
             hostname: newUrl.hostname,
             path: newUrl.pathname + newUrl.search,
             headers: {
-                 // Clean headers for the redirect fetch
                  'Accept': '*/*'
             }
           };
@@ -65,7 +63,6 @@ export const fetchFromScript = async (params: Record<string, any>, method: 'GET'
 
         res.on('end', () => {
           try {
-            // Apps Script sometimes returns empty string on success depending on implementation
             if (!data.trim()) {
                 resolve({ success: true });
                 return;
@@ -73,8 +70,13 @@ export const fetchFromScript = async (params: Record<string, any>, method: 'GET'
             const json = JSON.parse(data);
             resolve(json);
           } catch (e) {
-            console.error("Raw response from script:", data);
-            reject(new Error("Invalid JSON response from Google Script"));
+            console.error("Invalid JSON from Script:", data);
+            // If the script returns HTML (e.g. error page), log it.
+            if (data.includes("<!DOCTYPE html>")) {
+                reject(new Error("Google Script returned HTML (Auth/Error page) instead of JSON. Check Script permissions."));
+            } else {
+                reject(new Error("Invalid response format from Google Script"));
+            }
           }
         });
       });
@@ -84,7 +86,7 @@ export const fetchFromScript = async (params: Record<string, any>, method: 'GET'
         reject(e);
       });
 
-      // Write body if it exists (only for the initial POST, not for the redirect GET)
+      // Write body if it exists (only for the initial POST)
       if (postBody) {
         req.write(postBody);
       }

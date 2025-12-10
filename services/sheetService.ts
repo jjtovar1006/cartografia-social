@@ -12,13 +12,14 @@ const safeRequest = async (url: string, options?: RequestInit): Promise<any> => 
   const text = await response.text();
 
   if (!response.ok) {
+    console.error(`API Error (${response.status}) for ${url}:`, text);
     // Try to extract error message from JSON body, fallback to status text
     try {
       const jsonError = JSON.parse(text);
       throw new Error(jsonError.error || `Server Error ${response.status}`);
     } catch (e) {
       // If parsing fails, use the raw text (truncated)
-      throw new Error(`Request failed (${response.status}): ${text.substring(0, 100)}`);
+      throw new Error(`Request failed (${response.status}): ${text.substring(0, 200)}`);
     }
   }
 
@@ -27,7 +28,7 @@ const safeRequest = async (url: string, options?: RequestInit): Promise<any> => 
     if (!text.trim()) return null;
     return JSON.parse(text);
   } catch (e) {
-    console.error("Invalid JSON response:", text.substring(0, 200));
+    console.error("Invalid JSON response:", text.substring(0, 500));
     throw new Error("Invalid JSON response from server");
   }
 };
