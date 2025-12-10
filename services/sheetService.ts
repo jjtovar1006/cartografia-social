@@ -44,9 +44,13 @@ export const fetchCommunityStats = async (): Promise<CommunityStats[]> => {
     }
     return [];
   } catch (error) {
-    console.error("Failed to fetch community stats:", error);
-    // Return empty array instead of crashing
-    return [];
+    console.warn("Failed to fetch community stats (using demo data):", error);
+    // Return demo data if API fails (e.g. running locally without API or 404)
+    return [
+        { name: "Casco Central (Demo)", families: 45, population: 150 },
+        { name: "Sector Norte (Demo)", families: 32, population: 110 },
+        { name: "Sector Sur (Demo)", families: 28, population: 95 }
+    ];
   }
 };
 

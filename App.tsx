@@ -102,7 +102,7 @@ function App() {
         handleReset();
     } else {
         const password = window.prompt("Ingrese la clave de Administrador (Panel de Acceso):");
-        if (password === "admin123") { // Simple password for demonstration
+        if (password === "Apamate.25") { // Clave actualizada
             setIsAdmin(true);
             handleReset();
         } else if (password !== null) {

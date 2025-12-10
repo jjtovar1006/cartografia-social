@@ -17,22 +17,22 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onSelectCommunity, isLoadi
         <div className="flex flex-col md:flex-row items-center gap-8">
             <div className="flex-1">
                 <h2 className="text-3xl font-bold text-slate-800 mb-4">
-                  Historia del Proyecto de Cartografía Social
+                  Historia de la Comunidad
                 </h2>
                 <p className="text-slate-600 text-lg leading-relaxed mb-6">
-                  Esta herramienta de <strong>Gobierno Digital</strong> ha sido diseñada con un propósito altruista: 
-                  empoderar a los Consejos Comunales para planificar su futuro. A través del levantamiento 
-                  preciso de datos (Censo) y la delimitación geográfica (Cartografía), construimos la base 
-                  para planes de desarrollo cultural, político, social y económico.
+                  Este espacio honra la memoria y el esfuerzo de nuestros habitantes. 
+                  La cartografía social no es solo un mapa; es el reflejo de nuestras luchas, 
+                  nuestros logros y la proyección de nuestro futuro. Aquí documentamos la realidad 
+                  de nuestro territorio para construir, entre todos, el <strong>Plan de la Patria Comunal</strong>.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
                     <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-center gap-3">
                         <div className="bg-blue-600 text-white p-2 rounded-full"><Users size={20} /></div>
-                        <span className="font-semibold text-blue-900">Empoderamiento</span>
+                        <span className="font-semibold text-blue-900">Identidad</span>
                     </div>
                     <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 flex items-center gap-3">
                         <div className="bg-emerald-600 text-white p-2 rounded-full"><Activity size={20} /></div>
-                        <span className="font-semibold text-emerald-900">Datos Reales</span>
+                        <span className="font-semibold text-emerald-900">Organización</span>
                     </div>
                     <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 flex items-center gap-3">
                         <div className="bg-purple-600 text-white p-2 rounded-full"><MapPin size={20} /></div>
