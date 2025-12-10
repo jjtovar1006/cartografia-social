@@ -1,10 +1,11 @@
 // Helper function to communicate with Google Apps Script
 export const fetchFromScript = async (params: Record<string, any>, method: 'GET' | 'POST' = 'GET') => {
-  // Load the Apps Script URL from Vercel Environment Variables
-  const scriptUrl = process.env.APPS_SCRIPT_URL;
+  // Use the provided Apps Script URL directly
+  // This allows the app to work without setting up Vercel Environment Variables explicitly
+  const scriptUrl = process.env.APPS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycby-XbyZKagUuqLYo6BAo6KtzpKd2eCtEb2s_2lTp471Sexh8psqWf-coORQtlT4oKPm/exec";
 
   if (!scriptUrl) {
-    throw new Error('Missing APPS_SCRIPT_URL in environment variables.');
+    throw new Error('Missing APPS_SCRIPT_URL in environment variables or default configuration.');
   }
 
   // Construct URL with params for GET requests
@@ -12,7 +13,7 @@ export const fetchFromScript = async (params: Record<string, any>, method: 'GET'
   let options: RequestInit = {
     method: method,
     headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'text/plain;charset=utf-8', // Apps Script handles text/plain better for avoiding CORS preflight issues in some cases
     }
   };
 
@@ -21,10 +22,9 @@ export const fetchFromScript = async (params: Record<string, any>, method: 'GET'
     url = `${scriptUrl}?${queryParams}`;
   } else {
     // For POST, we send data in body
-    // Note: Google Apps Script redirects POST requests (302). 
-    // fetch usually follows redirects automatically.
+    // Google Apps Script requires specific handling. 
+    // Using simple stringify often works best with the doPost(e) setup provided previously.
     options.body = JSON.stringify(params);
-    options.redirect = 'follow'; 
   }
 
   const response = await fetch(url, options);
