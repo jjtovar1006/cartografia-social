@@ -1,40 +1,43 @@
-import { GoogleSpreadsheet } from 'google-spreadsheet';
-import { JWT } from 'google-auth-library';
+// Helper function to communicate with Google Apps Script
+export const fetchFromScript = async (params: Record<string, any>, method: 'GET' | 'POST' = 'GET') => {
+  // Load the Apps Script URL from Vercel Environment Variables
+  const scriptUrl = process.env.APPS_SCRIPT_URL;
 
-// Helper function to initialize the sheet
-export const getSheet = async (tabName: string = 'CARTOGRAFIA_AREAS') => {
-  // Load variables from Vercel Environment Variables
-  const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  // Properly handle private key newlines which are often escaped in env vars
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY
-    ? process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n').replace(/"/g, '')
-    : undefined;
-
-  // Use the specific ID provided by the user as default if env var is missing
-  const sheetId = process.env.GOOGLE_SHEET_ID || '1wKoukwkryMSWhcNZ0nan7b2EU10_sqOcVBaSe0hLwsA';
-
-  if (!serviceAccountEmail || !privateKey) {
-    throw new Error('Missing Google Sheets Credentials. Check GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_PRIVATE_KEY.');
+  if (!scriptUrl) {
+    throw new Error('Missing APPS_SCRIPT_URL in environment variables.');
   }
 
-  const serviceAccountAuth = new JWT({
-    email: serviceAccountEmail,
-    key: privateKey,
-    scopes: [
-      'https://www.googleapis.com/auth/spreadsheets',
-    ],
-  });
+  // Construct URL with params for GET requests
+  let url = scriptUrl;
+  let options: RequestInit = {
+    method: method,
+    headers: {
+        'Content-Type': 'application/json'
+    }
+  };
 
-  const doc = new GoogleSpreadsheet(sheetId, serviceAccountAuth);
-
-  await doc.loadInfo(); // loads document properties and worksheets
-  
-  // Return the specific tab requested
-  const sheet = doc.sheetsByTitle[tabName];
-  
-  if (!sheet) {
-      throw new Error(`Tab '${tabName}' not found in the Google Sheet (${sheetId}). Please ensure 'CENSO_HOGARES' and 'CARTOGRAFIA_AREAS' exist.`);
+  if (method === 'GET') {
+    const queryParams = new URLSearchParams(params).toString();
+    url = `${scriptUrl}?${queryParams}`;
+  } else {
+    // For POST, we send data in body
+    // Note: Google Apps Script redirects POST requests (302). 
+    // fetch usually follows redirects automatically.
+    options.body = JSON.stringify(params);
+    options.redirect = 'follow'; 
   }
 
-  return sheet;
+  const response = await fetch(url, options);
+  
+  if (!response.ok) {
+     throw new Error(`Error connecting to Sheet Script: ${response.statusText}`);
+  }
+
+  const text = await response.text();
+  try {
+      return JSON.parse(text);
+  } catch (e) {
+      console.error("Invalid JSON from Script:", text);
+      throw new Error("Invalid response format from Google Sheet Script");
+  }
 };

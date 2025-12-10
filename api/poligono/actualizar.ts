@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getSheet } from '../_utils/googleSheet';
+import { fetchFromScript } from '../_utils/googleSheet';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'PUT') {
@@ -7,37 +7,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { ID_AREA, GEOMETRIA_WKT, USUARIO_WKT, FECHA_ACTUALIZACION } = req.body;
+    const data = req.body;
+    
+    const payload = {
+        action: 'actualizar',
+        ...data
+    };
 
-    if (!ID_AREA || !GEOMETRIA_WKT) {
-      return res.status(400).json({ error: 'ID_AREA and GEOMETRIA_WKT are required' });
-    }
-
-    const sheet = await getSheet('CARTOGRAFIA_AREAS');
-    const rows = await sheet.getRows();
-
-    // Find the row with the matching ID
-    // FIX: In google-spreadsheet v4, access values directly via row['HeaderName']
-    const rowToUpdate = rows.find((r: any) => (r.get ? r.get('ID_AREA') : r['ID_AREA']) === ID_AREA);
-
-    if (!rowToUpdate) {
-      return res.status(404).json({ error: 'Polygon ID not found' });
-    }
-
-    // Update fields directly
-    if (rowToUpdate.set) {
-        rowToUpdate.set('GEOMETRIA_WKT', GEOMETRIA_WKT);
-        rowToUpdate.set('FECHA_ACTUALIZACION', FECHA_ACTUALIZACION);
-        rowToUpdate.set('USUARIO_WKT', USUARIO_WKT);
-    } else {
-        rowToUpdate['GEOMETRIA_WKT'] = GEOMETRIA_WKT;
-        rowToUpdate['FECHA_ACTUALIZACION'] = FECHA_ACTUALIZACION;
-        rowToUpdate['USUARIO_WKT'] = USUARIO_WKT;
-    }
-
-    await rowToUpdate.save();
-
-    return res.status(200).json({ success: true, message: 'Polygon updated successfully' });
+    // We send POST to the script even though it's an update logically, 
+    // the script handles the logic based on 'action'
+    const result = await fetchFromScript(payload, 'POST');
+    return res.status(200).json(result);
 
   } catch (error: any) {
     console.error('API Error:', error);

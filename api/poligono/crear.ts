@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getSheet } from '../_utils/googleSheet';
+import { fetchFromScript } from '../_utils/googleSheet';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -8,26 +8,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const data = req.body;
+    
+    // Add action to the body so Apps Script knows what to do
+    const payload = {
+        action: 'crear',
+        ...data
+    };
 
-    // Basic validation
-    if (!data.ID_AREA || !data.GEOMETRIA_WKT || !data.COMUNIDAD_ASOCIADA) {
-      return res.status(400).json({ error: 'Missing required fields (ID_AREA, GEOMETRIA_WKT, COMUNIDAD_ASOCIADA)' });
-    }
-
-    const sheet = await getSheet('CARTOGRAFIA_AREAS');
-
-    // Add the row to Google Sheets
-    await sheet.addRow({
-      ID_AREA: data.ID_AREA,
-      COMUNIDAD_ASOCIADA: data.COMUNIDAD_ASOCIADA,
-      TIPO_AREA: data.TIPO_AREA,
-      NOMBRE_AREA: data.NOMBRE_AREA,
-      GEOMETRIA_WKT: data.GEOMETRIA_WKT,
-      FECHA_ACTUALIZACION: data.FECHA_ACTUALIZACION,
-      USUARIO_WKT: data.USUARIO_WKT
-    });
-
-    return res.status(200).json({ success: true, message: 'Polygon created successfully' });
+    const result = await fetchFromScript(payload, 'POST');
+    return res.status(200).json(result);
 
   } catch (error: any) {
     console.error('API Error:', error);
