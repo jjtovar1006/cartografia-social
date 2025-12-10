@@ -42,25 +42,25 @@ const AreaForm: React.FC<AreaFormProps> = ({
   if (!isAdmin) {
       return (
         <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 h-full flex flex-col justify-center items-center text-center">
-            <div className="bg-white p-4 rounded-full shadow-sm mb-4">
-                <Map className="w-8 h-8 text-slate-400" />
+            <div className="bg-white p-4 rounded-full shadow-sm mb-4 border border-rose-100">
+                <Map className="w-8 h-8 text-rose-800" />
             </div>
-            <h2 className="text-lg font-bold text-slate-700">Modo Visualización</h2>
+            <h2 className="text-lg font-bold text-slate-800">Modo Visualización</h2>
             <p className="text-sm text-slate-500 mt-2 max-w-[200px]">
-                Para editar o agregar nuevas áreas, active el <strong>Modo Editor</strong> en la parte superior.
+                Para editar o agregar nuevas áreas, active el <strong>Modo Editor</strong> en el panel superior.
             </p>
         </div>
       );
   }
 
   return (
-    <div className={`p-6 rounded-xl shadow-sm border h-full flex flex-col ${isEditing ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200'}`}>
+    <div className={`p-6 rounded-xl shadow-sm border h-full flex flex-col ${isEditing ? 'bg-yellow-50 border-yellow-200' : 'bg-white border-slate-200'}`}>
       <div className="mb-6">
-        <h2 className={`text-xl font-bold flex items-center gap-2 ${isEditing ? 'text-amber-800' : 'text-slate-800'}`}>
+        <h2 className={`text-xl font-bold flex items-center gap-2 ${isEditing ? 'text-yellow-800' : 'text-blue-800'}`}>
           {isEditing ? <Edit className="w-5 h-5" /> : <Map className="w-5 h-5 text-blue-600" />}
           {isEditing ? 'Editando Área' : 'Nueva Área'}
         </h2>
-        <p className={`text-sm mt-1 ${isEditing ? 'text-amber-700' : 'text-slate-500'}`}>
+        <p className={`text-sm mt-1 ${isEditing ? 'text-yellow-700' : 'text-slate-500'}`}>
           {isEditing ? 'Modifique los puntos en el mapa o los datos.' : 'Complete la información para registrar.'}
         </p>
       </div>
@@ -140,7 +140,7 @@ const AreaForm: React.FC<AreaFormProps> = ({
             </span>
           </div>
           {points.length < 3 ? (
-             <div className="text-xs text-amber-600 flex items-center gap-1">
+             <div className="text-xs text-red-600 flex items-center gap-1">
                <AlertCircle className="w-3 h-3" /> Requiere 3+ puntos
              </div>
           ) : (
@@ -173,7 +173,7 @@ const AreaForm: React.FC<AreaFormProps> = ({
               onClick={handleSave}
               disabled={!isValid || isSaving}
               className={`py-3 px-4 rounded-lg font-medium shadow-md transition-all flex justify-center items-center gap-2 text-white
-                ${!isValid || isSaving ? 'bg-slate-400 cursor-not-allowed' : isEditing ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'}
+                ${!isValid || isSaving ? 'bg-slate-400 cursor-not-allowed' : isEditing ? 'bg-rose-900 hover:bg-rose-800' : 'bg-blue-600 hover:bg-blue-700'}
               `}
             >
               {isSaving ? 'Guardando...' : isEditing ? 'Actualizar' : 'Guardar'}

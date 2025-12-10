@@ -8,28 +8,21 @@ const API_STATS = '/api/stats';
  * Helper to safely parse JSON from a response
  */
 const safeRequest = async (url: string, options?: RequestInit): Promise<any> => {
-  const response = await fetch(url, options);
-  const text = await response.text();
-
-  if (!response.ok) {
-    console.error(`API Error (${response.status}) for ${url}:`, text);
-    // Try to extract error message from JSON body, fallback to status text
-    try {
-      const jsonError = JSON.parse(text);
-      throw new Error(jsonError.error || `Server Error ${response.status}`);
-    } catch (e) {
-      // If parsing fails, use the raw text (truncated)
-      throw new Error(`Request failed (${response.status}): ${text.substring(0, 200)}`);
-    }
-  }
-
   try {
+    const response = await fetch(url, options);
+    const text = await response.text();
+
+    if (!response.ok) {
+      console.warn(`API Error (${response.status}) for ${url}:`, text);
+      throw new Error(`Server Error ${response.status}`);
+    }
+
     // Handle empty responses
     if (!text.trim()) return null;
     return JSON.parse(text);
-  } catch (e) {
-    console.error("Invalid JSON response:", text.substring(0, 500));
-    throw new Error("Invalid JSON response from server");
+  } catch (error) {
+    console.warn(`Request failed for ${url}:`, error);
+    throw error;
   }
 };
 
@@ -38,15 +31,14 @@ const safeRequest = async (url: string, options?: RequestInit): Promise<any> => 
  */
 export const fetchCommunityStats = async (): Promise<CommunityStats[]> => {
   try {
-    // Updated to use the new root stats endpoint
     const data = await safeRequest(API_STATS);
     if (Array.isArray(data)) {
         return data as CommunityStats[];
     }
     return [];
   } catch (error) {
-    console.warn("Failed to fetch community stats (using demo data):", error);
-    // Return demo data if API fails (e.g. running locally without API or 404)
+    console.warn("Using demo data due to API error.");
+    // Return demo data if API fails (404, Network Error, etc)
     return [
         { name: "Casco Central (Demo)", families: 45, population: 150 },
         { name: "Sector Norte (Demo)", families: 32, population: 110 },

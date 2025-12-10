@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Polygon, Marker, useMapEvents, Polyline, CircleMarker, Popup, Tooltip } from 'react-leaflet';
+import React, { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Polygon, CircleMarker, Polyline, useMapEvents, Tooltip, Popup } from 'react-leaflet';
 import { AreaRecord, LatLng } from '../types';
 import { wktToPoints } from '../utils/geoUtils';
-import { MapPin, Eraser, MousePointerClick, Layers, Edit3, Eye, EyeOff, CheckSquare, Square } from 'lucide-react';
+import { MousePointerClick, Layers, Edit3, CheckSquare, Square, Eraser } from 'lucide-react';
 import L from 'leaflet';
 
 // Fix for default Leaflet marker icons in React
@@ -64,6 +64,11 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
 
   const polylinePositions = points.map(p => [p.lat, p.lng] as [number, number]);
 
+  // COLORS
+  const COLOR_VINOTINTO = '#881337'; // Rose 900
+  const COLOR_AMARILLO = '#eab308'; // Yellow 500
+  const COLOR_AZUL = '#2563eb'; // Blue 600
+
   return (
     <div className="relative h-full w-full rounded-lg overflow-hidden border border-slate-300 shadow-inner">
       <MapContainer center={center} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl={false}>
@@ -74,7 +79,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
         
         <ClickHandler onClick={handleMapClick} />
 
-        {/* 1. Render Existing Polygons (Controlled by Visibility State) */}
+        {/* 1. Render Existing Polygons */}
         {showExisting && existingPolygons.map((poly) => {
           const polyPoints = wktToPoints(poly.GEOMETRIA_WKT);
           if (polyPoints.length === 0) return null;
@@ -84,10 +89,12 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
               key={poly.ID_AREA}
               positions={polyPoints.map(p => [p.lat, p.lng] as [number, number])}
               pathOptions={{ 
-                  color: isAdmin ? '#d97706' : '#64748b', // Amber in admin mode, slate normally
-                  fillColor: isAdmin ? '#fbbf24' : '#94a3b8', 
-                  fillOpacity: 0.3, 
-                  weight: isAdmin ? 2 : 1 
+                  // If Admin mode, highlight borders in Yellow, fill in Vinotinto
+                  // If Normal mode, standard Vinotinto fill
+                  color: isAdmin ? COLOR_AMARILLO : COLOR_VINOTINTO, 
+                  fillColor: COLOR_VINOTINTO, 
+                  fillOpacity: isAdmin ? 0.5 : 0.4, 
+                  weight: isAdmin ? 3 : 2
               }}
               eventHandlers={{
                   click: () => {
@@ -97,15 +104,15 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                   }
               }}
             >
-              <Tooltip sticky>
-                 <span className="font-bold">{poly.NOMBRE_AREA}</span>
-                 {isAdmin && !isDrawing && <span className="block text-xs text-amber-600">(Clic para editar)</span>}
+              <Tooltip sticky direction="top">
+                 <span className="font-bold text-rose-900">{poly.NOMBRE_AREA}</span>
+                 {isAdmin && !isDrawing && <span className="block text-xs text-yellow-600 font-semibold">(Clic para editar)</span>}
               </Tooltip>
               {!isAdmin && (
                 <Popup>
                     <div className="text-sm">
-                    <strong className="block text-slate-800">{poly.NOMBRE_AREA}</strong>
-                    <span className="text-slate-500">{poly.TIPO_AREA}</span>
+                    <strong className="block text-rose-900 border-b border-rose-100 pb-1 mb-1">{poly.NOMBRE_AREA}</strong>
+                    <span className="text-slate-600 font-medium">{poly.TIPO_AREA}</span>
                     <br/>
                     <span className="text-xs text-slate-400">{poly.COMUNIDAD_ASOCIADA}</span>
                     </div>
@@ -115,15 +122,15 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
           );
         })}
 
-        {/* 2. Render Current Drawing / Editing (Controlled by Visibility State) */}
+        {/* 2. Render Current Drawing */}
         {showDrawing && (
             <>
                 {points.length > 0 && points.length < 3 && (
-                  <Polyline positions={polylinePositions} color="blue" dashArray="5, 10" />
+                  <Polyline positions={polylinePositions} color={COLOR_AZUL} dashArray="5, 10" />
                 )}
 
                 {points.length >= 3 && (
-                  <Polygon positions={polylinePositions} color="blue" fillColor="blue" fillOpacity={0.2} />
+                  <Polygon positions={polylinePositions} color={COLOR_AZUL} fillColor={COLOR_AZUL} fillOpacity={0.2} />
                 )}
 
                 {points.map((p, idx) => (
@@ -131,7 +138,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                     key={`${p.lat}-${p.lng}-${idx}`} 
                     center={[p.lat, p.lng]} 
                     radius={5} 
-                    pathOptions={{ color: 'white', fillColor: 'blue', fillOpacity: 1, weight: 2 }} 
+                    pathOptions={{ color: 'white', fillColor: COLOR_AZUL, fillOpacity: 1, weight: 2 }} 
                   />
                 ))}
             </>
@@ -144,7 +151,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
         
         {/* Status Badge */}
         <div className={`p-2 rounded-md shadow-lg border text-xs font-medium flex items-center gap-2 ${
-            isDrawing ? 'bg-white border-blue-200 text-blue-700' : 'bg-white border-slate-200 text-slate-600'
+            isDrawing ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-white border-slate-200 text-slate-600'
         }`}>
            {isDrawing ? (
              <>
@@ -153,13 +160,13 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
              </>
            ) : (
              <>
-               <Layers className="w-4 h-4" />
+               <Layers className="w-4 h-4 text-rose-800" />
                {existingPolygons.length} áreas cargadas
              </>
            )}
         </div>
 
-        {/* Layer Control Button & Menu */}
+        {/* Layer Control */}
         <div className="relative">
             <button 
                 onClick={() => setIsLayersMenuOpen(!isLayersMenuOpen)}
@@ -167,7 +174,6 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                 title="Control de Capas"
             >
                 <Layers className="w-5 h-5" />
-                <span className="sr-only">Capas</span>
             </button>
             
             {isLayersMenuOpen && (
@@ -181,10 +187,10 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                         className="flex items-center justify-between p-2 rounded hover:bg-slate-50 text-sm text-slate-700 transition-colors"
                     >
                         <div className="flex items-center gap-2">
-                             {showExisting ? <CheckSquare className="w-4 h-4 text-blue-600" /> : <Square className="w-4 h-4 text-slate-400" />}
+                             {showExisting ? <CheckSquare className="w-4 h-4 text-rose-800" /> : <Square className="w-4 h-4 text-slate-400" />}
                              <span>Áreas Registradas</span>
                         </div>
-                        <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-xs font-mono">{existingPolygons.length}</span>
+                        <span className="bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded text-xs font-mono">{existingPolygons.length}</span>
                     </button>
 
                     <button 
@@ -192,11 +198,11 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                         className="flex items-center justify-between p-2 rounded hover:bg-slate-50 text-sm text-slate-700 transition-colors"
                     >
                          <div className="flex items-center gap-2">
-                             {showDrawing ? <CheckSquare className="w-4 h-4 text-amber-600" /> : <Square className="w-4 h-4 text-slate-400" />}
+                             {showDrawing ? <CheckSquare className="w-4 h-4 text-blue-600" /> : <Square className="w-4 h-4 text-slate-400" />}
                              <span>Dibujo Actual</span>
                         </div>
                         {points.length > 0 && (
-                            <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-xs font-mono">{points.length} pts</span>
+                            <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-xs font-mono">{points.length} pts</span>
                         )}
                     </button>
                 </div>
@@ -205,7 +211,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
 
         {/* Action Hint */}
         {isAdmin && !isDrawing && (
-             <div className="bg-amber-50 p-2 rounded-md shadow-lg border border-amber-200 text-xs font-medium text-amber-800 flex items-center gap-2">
+             <div className="bg-yellow-50 p-2 rounded-md shadow-lg border border-yellow-200 text-xs font-bold text-yellow-800 flex items-center gap-2">
                 <Edit3 className="w-4 h-4" />
                 Selecciona un área
              </div>
