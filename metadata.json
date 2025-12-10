@@ -1,0 +1,7 @@
+{
+  "name": "Gobierno Comunal",
+  "description": "A digital government tool for community councils to map polygons and territories, integrated with Google Sheets and Looker Studio.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
