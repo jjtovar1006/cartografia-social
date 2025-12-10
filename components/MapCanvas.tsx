@@ -64,10 +64,10 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
 
   const polylinePositions = points.map(p => [p.lat, p.lng] as [number, number]);
 
-  // COLORS
-  const COLOR_VINOTINTO = '#881337'; // Rose 900
-  const COLOR_AMARILLO = '#eab308'; // Yellow 500
-  const COLOR_AZUL = '#2563eb'; // Blue 600
+  // COLORES INSTITUCIONALES Y PATRIOS
+  const COLOR_VINOTINTO = '#881337'; // Rose 900 - Color base institucional
+  const COLOR_AMARILLO = '#eab308'; // Yellow 500 - Para resaltar edición/admin
+  const COLOR_AZUL = '#2563eb'; // Blue 600 - Para dibujo activo (acción)
 
   return (
     <div className="relative h-full w-full rounded-lg overflow-hidden border border-slate-300 shadow-inner">
@@ -89,8 +89,8 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
               key={poly.ID_AREA}
               positions={polyPoints.map(p => [p.lat, p.lng] as [number, number])}
               pathOptions={{ 
-                  // If Admin mode, highlight borders in Yellow, fill in Vinotinto
-                  // If Normal mode, standard Vinotinto fill
+                  // Si es Admin, bordes AMARILLOS para resaltar.
+                  // Si es Usuario normal, todo VINOTINTO.
                   color: isAdmin ? COLOR_AMARILLO : COLOR_VINOTINTO, 
                   fillColor: COLOR_VINOTINTO, 
                   fillOpacity: isAdmin ? 0.5 : 0.4, 
@@ -122,7 +122,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
           );
         })}
 
-        {/* 2. Render Current Drawing */}
+        {/* 2. Render Current Drawing (AZUL) */}
         {showDrawing && (
             <>
                 {points.length > 0 && points.length < 3 && (

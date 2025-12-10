@@ -10,17 +10,29 @@ const API_STATS = '/api/stats';
 const safeRequest = async (url: string, options?: RequestInit): Promise<any> => {
   try {
     const response = await fetch(url, options);
-    const text = await response.text();
-
+    
     if (!response.ok) {
-      console.warn(`API Error (${response.status}) for ${url}:`, text);
-      throw new Error(`Server Error ${response.status}`);
+        // Specifically handle 404 (Not Found) which usually means the backend function 
+        // isn't running or available in the current environment (e.g. local preview)
+        if (response.status === 404) {
+             console.warn(`API Not Found (${url}). Switching to local demo data.`);
+             throw new Error('API_NOT_FOUND');
+        }
+        
+        const text = await response.text();
+        console.warn(`API Error (${response.status}) for ${url}:`, text);
+        throw new Error(`Server Error ${response.status}`);
     }
 
+    const text = await response.text();
     // Handle empty responses
     if (!text.trim()) return null;
     return JSON.parse(text);
   } catch (error) {
+    // Re-throw if it's our custom error, otherwise log
+    if (error instanceof Error && error.message === 'API_NOT_FOUND') {
+        throw error;
+    }
     console.warn(`Request failed for ${url}:`, error);
     throw error;
   }
@@ -37,7 +49,6 @@ export const fetchCommunityStats = async (): Promise<CommunityStats[]> => {
     }
     return [];
   } catch (error) {
-    console.warn("Using demo data due to API error.");
     // Return demo data if API fails (404, Network Error, etc)
     return [
         { name: "Casco Central (Demo)", families: 45, population: 150 },

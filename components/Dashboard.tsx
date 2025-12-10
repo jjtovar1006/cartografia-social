@@ -34,8 +34,9 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onSelectCommunity, isLoadi
                   de nuestro territorio para construir, entre todos, el <strong>Plan de la Patria Comunal</strong>.
                 </p>
                 
-                {/* Tricolor Pillars */}
+                {/* Tricolor Pillars - Bandera de Venezuela */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+                    {/* AMARILLO: Riqueza/Identidad */}
                     <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200 flex items-center gap-3">
                         <div className="bg-yellow-500 text-white p-2 rounded-full shadow-sm"><Users size={20} /></div>
                         <div>
@@ -43,6 +44,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onSelectCommunity, isLoadi
                             <span className="text-xs text-yellow-700">Nuestra Gente</span>
                         </div>
                     </div>
+                    {/* AZUL: Mar/Organización */}
                     <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 flex items-center gap-3">
                         <div className="bg-blue-600 text-white p-2 rounded-full shadow-sm"><Activity size={20} /></div>
                         <div>
@@ -50,6 +52,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onSelectCommunity, isLoadi
                             <span className="text-xs text-blue-700">Nuestra Estructura</span>
                         </div>
                     </div>
+                    {/* ROJO: Sangre/Territorio */}
                     <div className="bg-red-50 p-4 rounded-xl border border-red-200 flex items-center gap-3">
                         <div className="bg-red-600 text-white p-2 rounded-full shadow-sm"><MapPin size={20} /></div>
                         <div>
@@ -60,7 +63,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onSelectCommunity, isLoadi
                 </div>
             </div>
 
-            {/* Stats Card - Vinotinto */}
+            {/* Stats Card - VINOTINTO Institucional */}
             <div className="w-full md:w-1/3">
                 <div className="bg-rose-900 rounded-2xl p-6 text-white shadow-xl transform rotate-1 md:rotate-2 hover:rotate-0 transition-transform border-t-4 border-yellow-400">
                     <div className="flex items-center justify-between mb-4">
@@ -89,6 +92,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onSelectCommunity, isLoadi
       {/* 2. Community List & Stats */}
       <section>
         <div className="flex items-center gap-3 mb-6">
+            {/* Barra lateral tricolor */}
             <div className="h-8 w-1.5 bg-gradient-to-b from-yellow-400 via-blue-600 to-red-600 rounded-full"></div>
             <h3 className="text-2xl font-bold text-slate-800">Resumen por Consejo Comunal</h3>
         </div>
@@ -131,7 +135,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onSelectCommunity, isLoadi
                                 </div>
                             </div>
 
-                            {/* Tricolor Visual Bar */}
+                            {/* Tricolor Visual Bar - Densidad */}
                             <div className="mb-6">
                                 <div className="text-xs text-slate-400 mb-1 flex justify-between">
                                     <span>Densidad relativa</span>

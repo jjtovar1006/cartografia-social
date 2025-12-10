@@ -162,6 +162,7 @@ const AreaForm: React.FC<AreaFormProps> = ({
          </button>
         ) : (
           <div className="grid grid-cols-2 gap-3">
+            {/* Botón CANCELAR - Rojo */}
             <button
               onClick={handleReset}
               className="py-3 px-4 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded-lg font-medium transition-all flex justify-center items-center gap-2"
@@ -169,6 +170,7 @@ const AreaForm: React.FC<AreaFormProps> = ({
               <Trash2 className="w-4 h-4" />
               Cancelar
             </button>
+             {/* Botón GUARDAR - Azul (Crear) o Vinotinto (Editar) */}
              <button
               onClick={handleSave}
               disabled={!isValid || isSaving}

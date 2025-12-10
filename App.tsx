@@ -211,7 +211,7 @@ function App() {
           </div>
 
           <div className="flex items-center gap-4">
-             {/* Admin Toggle */}
+             {/* Admin Toggle - Amarillo en modo activo */}
              <button
                 onClick={toggleAdminMode}
                 className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
