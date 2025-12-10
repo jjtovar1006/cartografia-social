@@ -1,8 +1,8 @@
 import { AreaRecord, CommunityStats } from '../types';
 
-// In Vercel, relative paths work automatically when hosted on the same domain
-// Consolidated endpoints under /api/poligono to ensure reliable routing
+// Endpoints
 const API_BASE_POLIGONO = '/api/poligono';
+const API_STATS = '/api/stats';
 
 /**
  * Helper to safely parse JSON from a response
@@ -37,8 +37,8 @@ const safeRequest = async (url: string, options?: RequestInit): Promise<any> => 
  */
 export const fetchCommunityStats = async (): Promise<CommunityStats[]> => {
   try {
-    // Updated to use the new file location
-    const data = await safeRequest(`${API_BASE_POLIGONO}/stats`);
+    // Updated to use the new root stats endpoint
+    const data = await safeRequest(API_STATS);
     if (Array.isArray(data)) {
         return data as CommunityStats[];
     }

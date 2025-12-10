@@ -95,6 +95,22 @@ function App() {
     });
   };
 
+  // Secure Admin Toggle
+  const toggleAdminMode = () => {
+    if (isAdmin) {
+        setIsAdmin(false);
+        handleReset();
+    } else {
+        const password = window.prompt("Ingrese la clave de Administrador (Panel de Acceso):");
+        if (password === "admin123") { // Simple password for demonstration
+            setIsAdmin(true);
+            handleReset();
+        } else if (password !== null) {
+            alert("Contraseña incorrecta.");
+        }
+    }
+  };
+
   // Triggered when clicking a polygon on the map in Admin mode
   const handleEditPolygon = (poly: AreaRecord) => {
     if (!isAdmin) return;
@@ -159,9 +175,7 @@ function App() {
     }
   };
 
-  // Filter polygons: Show selected community OR show all if in Dashboard/Admin view could be useful, 
-  // but let's stick to filtering by community to keep map clean.
-  // CRITICAL: Filter out the polygon currently being edited so it doesn't appear twice (static vs editable)
+  // Filter polygons
   const filteredPolygons = existingPolygons
     .filter(p => selectedCommunity ? p.COMUNIDAD_ASOCIADA === selectedCommunity : true)
     .filter(p => p.ID_AREA !== editingId);
@@ -198,10 +212,7 @@ function App() {
           <div className="flex items-center gap-4">
              {/* Admin Toggle */}
              <button
-                onClick={() => {
-                    setIsAdmin(!isAdmin);
-                    handleReset(); // Reset form when switching modes
-                }}
+                onClick={toggleAdminMode}
                 className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
                     isAdmin 
                     ? 'bg-amber-100 text-amber-800 border border-amber-200' 
@@ -209,7 +220,7 @@ function App() {
                 }`}
              >
                 {isAdmin ? <Unlock size={14} /> : <Lock size={14} />}
-                {isAdmin ? 'Modo Editor' : 'Solo Lectura'}
+                {isAdmin ? 'Modo Editor' : 'Acceso Admin'}
              </button>
 
              {view === 'dashboard' && !isAdmin && (
