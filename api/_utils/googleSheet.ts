@@ -63,6 +63,7 @@ export const fetchFromScript = async (params: Record<string, any>, method: 'GET'
 
         res.on('end', () => {
           try {
+            // Apps Script sometimes returns empty string on success
             if (!data.trim()) {
                 resolve({ success: true });
                 return;
@@ -71,11 +72,13 @@ export const fetchFromScript = async (params: Record<string, any>, method: 'GET'
             resolve(json);
           } catch (e) {
             console.error("Invalid JSON from Script:", data);
-            // If the script returns HTML (e.g. error page), log it.
-            if (data.includes("<!DOCTYPE html>")) {
-                reject(new Error("Google Script returned HTML (Auth/Error page) instead of JSON. Check Script permissions."));
+            // If the script returns HTML (e.g. error page or Google login), log it clearly
+            if (data.includes("<!DOCTYPE html>") || data.includes("<html")) {
+                const titleMatch = data.match(/<title>(.*?)<\/title>/);
+                const title = titleMatch ? titleMatch[1] : "Unknown HTML Page";
+                reject(new Error(`Google Script returned HTML (${title}) instead of JSON. The script might be restricted or asking for login.`));
             } else {
-                reject(new Error("Invalid response format from Google Script"));
+                reject(new Error(`Invalid response format from Google Script: ${data.substring(0, 100)}...`));
             }
           }
         });
