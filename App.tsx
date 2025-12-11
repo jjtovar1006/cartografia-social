@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import MapCanvas from './components/MapCanvas';
 import AreaForm from './components/AreaForm';
 import Dashboard from './components/Dashboard';
-import { AreaRecord, AreaType, LatLng, CommunityStats } from './types';
+import { AreaRecord, AreaType, LatLng, CommunityStats, HouseholdRecord } from './types';
 import { generateUniqueId, getCurrentDateTime, pointsToWKT, wktToPoints } from './utils/geoUtils';
-import { saveAreaToSheet, fetchAreasFromSheet, fetchCommunityStats, updateAreaInSheet } from './services/sheetService';
+import { saveAreaToSheet, fetchAreasFromSheet, fetchCommunityStats, updateAreaInSheet, fetchHouseholdsFromSheet } from './services/sheetService';
 import { ArrowLeft, LayoutDashboard, Lock, Unlock, ShieldCheck } from 'lucide-react';
 
 function App() {
@@ -20,10 +20,14 @@ function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [existingPolygons, setExistingPolygons] = useState<AreaRecord[]>([]);
+  const [households, setHouseholds] = useState<HouseholdRecord[]>([]);
   
   // Edit Mode State
   const [editingId, setEditingId] = useState<string | null>(null);
   
+  // Suggested Center (Calculated from Census)
+  const [suggestedCenter, setSuggestedCenter] = useState<LatLng | null>(null);
+
   // Form State Updated with Geography
   const [formData, setFormData] = useState({
     community: '',
@@ -35,17 +39,12 @@ function App() {
     parish: ''
   });
 
-  // Load stats on mount
+  // Load stats and polygons on mount
   useEffect(() => {
     loadStats();
+    loadPolygons(); // Pre-load polygons
+    loadHouseholds(); // Load census data for referencing
   }, []);
-
-  // When switching to map, load polygons
-  useEffect(() => {
-    if (view === 'map') {
-      loadPolygons();
-    }
-  }, [view]);
 
   // When community changes via dashboard, update form default and try to pre-fill geography from stats
   useEffect(() => {
@@ -58,8 +57,44 @@ function App() {
           municipality: statMatch?.municipality || '',
           parish: statMatch?.parish || ''
       }));
+
+      // Calculate Suggested Center based on Households
+      calculateSuggestedCenter(selectedCommunity);
+    } else {
+        setSuggestedCenter(null);
     }
-  }, [selectedCommunity, communityStats]);
+  }, [selectedCommunity, communityStats, households]);
+
+  const calculateSuggestedCenter = (communityName: string) => {
+      // Filtrar hogares de esta comunidad
+      const communityHouseholds = households.filter(h => h.COMUNIDAD === communityName);
+      
+      if (communityHouseholds.length > 0) {
+          let latSum = 0;
+          let lngSum = 0;
+          let count = 0;
+
+          communityHouseholds.forEach(h => {
+             // Asegurar que sean números válidos
+             const lat = Number(h.COORDENADA_LAT);
+             const lng = Number(h.COORDENADA_LONG);
+             if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+                 latSum += lat;
+                 lngSum += lng;
+                 count++;
+             }
+          });
+
+          if (count > 0) {
+              setSuggestedCenter({
+                  lat: latSum / count,
+                  lng: lngSum / count
+              });
+              return;
+          }
+      }
+      setSuggestedCenter(null);
+  };
 
   const loadStats = async () => {
     setIsLoadingStats(true);
@@ -80,6 +115,15 @@ function App() {
     } catch (error) {
       console.error("Could not load polygons", error);
     }
+  };
+
+  const loadHouseholds = async () => {
+      try {
+          const data = await fetchHouseholdsFromSheet();
+          setHouseholds(data);
+      } catch (error) {
+          console.error("Could not load households", error);
+      }
   };
 
   const handleSelectCommunity = (name: string) => {
@@ -276,6 +320,7 @@ function App() {
                     existingPolygons={filteredPolygons}
                     onPolygonClick={handleEditPolygon}
                     isAdmin={isAdmin}
+                    suggestedCenter={suggestedCenter}
                 />
                 </div>
 

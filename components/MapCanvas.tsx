@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Polygon, CircleMarker, Polyline, useMapEvents, Tooltip, Popup, Marker } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon, CircleMarker, Polyline, useMapEvents, Tooltip, Popup, Marker, LayersControl } from 'react-leaflet';
 import { AreaRecord, LatLng, AreaType } from '../types';
 import { wktToPoints, getPolygonCentroid } from '../utils/geoUtils';
-import { MousePointerClick, Layers, Edit3, CheckSquare, Square, Eraser, MapPin, Filter } from 'lucide-react';
+import { MousePointerClick, Layers, CheckSquare, Square, Eraser, MapPin, Filter } from 'lucide-react';
 import L from 'leaflet';
 
 // Fix for default Leaflet marker icons in React
@@ -21,6 +21,7 @@ interface MapCanvasProps {
   existingPolygons?: AreaRecord[];
   onPolygonClick?: (poly: AreaRecord) => void;
   isAdmin?: boolean;
+  suggestedCenter?: LatLng | null; // Nuevo prop para centrar basado en Censo
 }
 
 const ClickHandler: React.FC<{ onClick: (e: L.LeafletMouseEvent) => void }> = ({ onClick }) => {
@@ -30,13 +31,25 @@ const ClickHandler: React.FC<{ onClick: (e: L.LeafletMouseEvent) => void }> = ({
   return null;
 };
 
+// Component to handle programmatic map movement
+const MapUpdater: React.FC<{ center: LatLng | null }> = ({ center }) => {
+  const map = useMapEvents({});
+  useEffect(() => {
+    if (center) {
+      map.flyTo([center.lat, center.lng], 16, { duration: 1.5 });
+    }
+  }, [center, map]);
+  return null;
+};
+
 const MapCanvas: React.FC<MapCanvasProps> = ({ 
     points, 
     setPoints, 
     isDrawing, 
     existingPolygons = [], 
     onPolygonClick,
-    isAdmin = false
+    isAdmin = false,
+    suggestedCenter
 }) => {
   const [center, setCenter] = useState<[number, number]>([10.4806, -66.9036]);
   
@@ -47,11 +60,16 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   
   // Filter State
   const [selectedAreaTypes, setSelectedAreaTypes] = useState<AreaType[]>(Object.values(AreaType));
-  
   const [isLayersMenuOpen, setIsLayersMenuOpen] = useState(false);
 
   useEffect(() => {
-    // Si hay polígonos existentes, centrar en el primero para mejor UX
+    // Prioridad 1: Centro sugerido (Censo)
+    if (suggestedCenter) {
+      setCenter([suggestedCenter.lat, suggestedCenter.lng]);
+      return;
+    }
+
+    // Prioridad 2: Polígonos existentes
     if (existingPolygons.length > 0) {
         const firstPoly = wktToPoints(existingPolygons[0].GEOMETRIA_WKT);
         if (firstPoly.length > 0) {
@@ -60,12 +78,13 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
         }
     }
 
-    if (navigator.geolocation) {
+    // Prioridad 3: Geolocalización del navegador
+    if (navigator.geolocation && !suggestedCenter && existingPolygons.length === 0) {
       navigator.geolocation.getCurrentPosition((position) => {
         setCenter([position.coords.latitude, position.coords.longitude]);
       });
     }
-  }, [existingPolygons]);
+  }, [existingPolygons, suggestedCenter]);
 
   const handleMapClick = (e: L.LeafletMouseEvent) => {
     if (!isDrawing) return;
@@ -91,7 +110,6 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   const COLOR_AMARILLO = '#eab308'; // Yellow 500
   const COLOR_AZUL = '#2563eb'; // Blue 600
 
-  // Helper to get color based on type (Optional visual distinction)
   const getPolyColor = (type: AreaType) => {
       if (isAdmin) return COLOR_AMARILLO;
       switch(type) {
@@ -105,16 +123,30 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   return (
     <div className="relative h-full w-full rounded-lg overflow-hidden border border-slate-300 shadow-inner">
       <MapContainer center={center} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl={false}>
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        
+        {/* CONTROL DE CAPAS: CALLE VS SATÉLITE */}
+        <LayersControl position="bottomleft">
+          <LayersControl.BaseLayer checked name="Mapa Callejero">
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Vista Satelital">
+            <TileLayer
+              attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            />
+          </LayersControl.BaseLayer>
+        </LayersControl>
         
         <ClickHandler onClick={handleMapClick} />
+        
+        {/* Componente auxiliar para animar el vuelo al centro sugerido */}
+        <MapUpdater center={suggestedCenter} />
 
         {/* 1. Render Existing Data */}
         {existingPolygons.map((poly) => {
-          // Filter logic
           if (!selectedAreaTypes.includes(poly.TIPO_AREA)) return null;
 
           const polyPoints = wktToPoints(poly.GEOMETRIA_WKT);
@@ -159,11 +191,9 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                                     <MapPin size={16} className="text-rose-800" />
                                     <strong className="block text-rose-900 text-base">{poly.NOMBRE_AREA}</strong>
                                 </div>
-                                
                                 <span className="inline-block bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full mb-2 font-medium border border-blue-100">
                                     {poly.TIPO_AREA}
                                 </span>
-                                
                                 <div className="space-y-1">
                                     <div className="text-xs text-slate-500">
                                         <span className="font-semibold text-slate-700">Comunidad:</span> {poly.COMUNIDAD_ASOCIADA}
@@ -201,6 +231,18 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                   />
                 ))}
             </>
+        )}
+
+        {/* 3. Render Suggested Center Marker (Censo) if drawing new area */}
+        {suggestedCenter && isDrawing && points.length === 0 && (
+           <Marker position={[suggestedCenter.lat, suggestedCenter.lng]} opacity={0.7}>
+              <Popup>
+                <div className="text-center">
+                   <strong>Punto de Referencia (Censo)</strong><br/>
+                   Comience a dibujar cerca de aquí.
+                </div>
+              </Popup>
+           </Marker>
         )}
 
       </MapContainer>
@@ -271,7 +313,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                         </div>
                     </button>
 
-                    {/* NEW: Filter by Type Section */}
+                    {/* Filter by Type Section */}
                     <div className="border-t border-slate-100 my-1 pt-2">
                         <div className="flex items-center gap-1.5 mb-2 px-1">
                             <Filter size={12} className="text-slate-400" />
