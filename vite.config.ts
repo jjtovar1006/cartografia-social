@@ -15,10 +15,9 @@ export default defineConfig({
     },
   },
   build: {
-    // Forzamos explícitamente el nombre 'dist'
+    // IMPORTANTE: Vercel espera 'dist'
     outDir: 'dist',
     assetsDir: 'assets',
-    // Limpia la carpeta antes de compilar
     emptyOutDir: true,
     sourcemap: false
   },
