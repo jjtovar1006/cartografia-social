@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Polygon, CircleMarker, Polyline, useMapEvents, Tooltip, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon, CircleMarker, Polyline, useMapEvents, Tooltip, Popup, Marker } from 'react-leaflet';
 import { AreaRecord, LatLng } from '../types';
-import { wktToPoints } from '../utils/geoUtils';
-import { MousePointerClick, Layers, Edit3, CheckSquare, Square, Eraser } from 'lucide-react';
+import { wktToPoints, getPolygonCentroid } from '../utils/geoUtils';
+import { MousePointerClick, Layers, Edit3, CheckSquare, Square, Eraser, MapPin } from 'lucide-react';
 import L from 'leaflet';
 
 // Fix for default Leaflet marker icons in React
@@ -41,17 +41,27 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   const [center, setCenter] = useState<[number, number]>([10.4806, -66.9036]);
   
   // Layer Visibility State
-  const [showExisting, setShowExisting] = useState(true);
+  const [showPolygons, setShowPolygons] = useState(true);
+  const [showMarkers, setShowMarkers] = useState(true);
   const [showDrawing, setShowDrawing] = useState(true);
   const [isLayersMenuOpen, setIsLayersMenuOpen] = useState(false);
 
   useEffect(() => {
+    // Si hay polígonos existentes, centrar en el primero
+    if (existingPolygons.length > 0) {
+        const firstPoly = wktToPoints(existingPolygons[0].GEOMETRIA_WKT);
+        if (firstPoly.length > 0) {
+            setCenter([firstPoly[0].lat, firstPoly[0].lng]);
+            return;
+        }
+    }
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((position) => {
         setCenter([position.coords.latitude, position.coords.longitude]);
       });
     }
-  }, []);
+  }, [existingPolygons]);
 
   const handleMapClick = (e: L.LeafletMouseEvent) => {
     if (!isDrawing) return;
@@ -65,9 +75,9 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   const polylinePositions = points.map(p => [p.lat, p.lng] as [number, number]);
 
   // COLORES INSTITUCIONALES Y PATRIOS
-  const COLOR_VINOTINTO = '#881337'; // Rose 900 - Color base institucional
-  const COLOR_AMARILLO = '#eab308'; // Yellow 500 - Para resaltar edición/admin
-  const COLOR_AZUL = '#2563eb'; // Blue 600 - Para dibujo activo (acción)
+  const COLOR_VINOTINTO = '#881337'; // Rose 900
+  const COLOR_AMARILLO = '#eab308'; // Yellow 500
+  const COLOR_AZUL = '#2563eb'; // Blue 600
 
   return (
     <div className="relative h-full w-full rounded-lg overflow-hidden border border-slate-300 shadow-inner">
@@ -79,46 +89,54 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
         
         <ClickHandler onClick={handleMapClick} />
 
-        {/* 1. Render Existing Polygons */}
-        {showExisting && existingPolygons.map((poly) => {
+        {/* 1. Render Existing Data */}
+        {existingPolygons.map((poly) => {
           const polyPoints = wktToPoints(poly.GEOMETRIA_WKT);
           if (polyPoints.length === 0) return null;
+          const centroid = getPolygonCentroid(polyPoints);
           
           return (
-            <Polygon 
-              key={poly.ID_AREA}
-              positions={polyPoints.map(p => [p.lat, p.lng] as [number, number])}
-              pathOptions={{ 
-                  // Si es Admin, bordes AMARILLOS para resaltar.
-                  // Si es Usuario normal, todo VINOTINTO.
-                  color: isAdmin ? COLOR_AMARILLO : COLOR_VINOTINTO, 
-                  fillColor: COLOR_VINOTINTO, 
-                  fillOpacity: isAdmin ? 0.5 : 0.4, 
-                  weight: isAdmin ? 3 : 2
-              }}
-              eventHandlers={{
-                  click: () => {
-                      if (isAdmin && onPolygonClick && !isDrawing) {
-                          onPolygonClick(poly);
-                      }
-                  }
-              }}
-            >
-              <Tooltip sticky direction="top">
-                 <span className="font-bold text-rose-900">{poly.NOMBRE_AREA}</span>
-                 {isAdmin && !isDrawing && <span className="block text-xs text-yellow-600 font-semibold">(Clic para editar)</span>}
-              </Tooltip>
-              {!isAdmin && (
-                <Popup>
-                    <div className="text-sm">
-                    <strong className="block text-rose-900 border-b border-rose-100 pb-1 mb-1">{poly.NOMBRE_AREA}</strong>
-                    <span className="text-slate-600 font-medium">{poly.TIPO_AREA}</span>
-                    <br/>
-                    <span className="text-xs text-slate-400">{poly.COMUNIDAD_ASOCIADA}</span>
-                    </div>
-                </Popup>
-              )}
-            </Polygon>
+            <React.Fragment key={poly.ID_AREA}>
+                {/* A. POLYGONS LAYER */}
+                {showPolygons && (
+                    <Polygon 
+                    positions={polyPoints.map(p => [p.lat, p.lng] as [number, number])}
+                    pathOptions={{ 
+                        color: isAdmin ? COLOR_AMARILLO : COLOR_VINOTINTO, 
+                        fillColor: COLOR_VINOTINTO, 
+                        fillOpacity: isAdmin ? 0.4 : 0.3, 
+                        weight: isAdmin ? 3 : 2
+                    }}
+                    eventHandlers={{
+                        click: () => {
+                            if (isAdmin && onPolygonClick && !isDrawing) {
+                                onPolygonClick(poly);
+                            }
+                        }
+                    }}
+                    >
+                        <Tooltip sticky direction="top">
+                            <span className="font-bold text-rose-900">{poly.NOMBRE_AREA}</span>
+                        </Tooltip>
+                    </Polygon>
+                )}
+
+                {/* B. MARKERS LAYER (Points of Coordinates) */}
+                {showMarkers && centroid && !isDrawing && (
+                    <Marker position={[centroid.lat, centroid.lng]}>
+                        <Popup>
+                            <div className="text-sm min-w-[150px]">
+                                <strong className="block text-rose-900 border-b border-rose-100 pb-1 mb-1 text-base">{poly.NOMBRE_AREA}</strong>
+                                <span className="text-slate-600 font-medium block">{poly.TIPO_AREA}</span>
+                                <span className="text-xs text-slate-500 block mt-1">Comunidad: {poly.COMUNIDAD_ASOCIADA}</span>
+                                <div className="mt-2 text-xs text-slate-400 font-mono bg-slate-50 p-1 rounded">
+                                    {centroid.lat.toFixed(5)}, {centroid.lng.toFixed(5)}
+                                </div>
+                            </div>
+                        </Popup>
+                    </Marker>
+                )}
+            </React.Fragment>
           );
         })}
 
@@ -183,14 +201,23 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                     </div>
                     
                     <button 
-                        onClick={() => setShowExisting(!showExisting)}
+                        onClick={() => setShowPolygons(!showPolygons)}
                         className="flex items-center justify-between p-2 rounded hover:bg-slate-50 text-sm text-slate-700 transition-colors"
                     >
                         <div className="flex items-center gap-2">
-                             {showExisting ? <CheckSquare className="w-4 h-4 text-rose-800" /> : <Square className="w-4 h-4 text-slate-400" />}
-                             <span>Áreas Registradas</span>
+                             {showPolygons ? <CheckSquare className="w-4 h-4 text-rose-800" /> : <Square className="w-4 h-4 text-slate-400" />}
+                             <span>Polígonos (Áreas)</span>
                         </div>
-                        <span className="bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded text-xs font-mono">{existingPolygons.length}</span>
+                    </button>
+
+                    <button 
+                        onClick={() => setShowMarkers(!showMarkers)}
+                        className="flex items-center justify-between p-2 rounded hover:bg-slate-50 text-sm text-slate-700 transition-colors"
+                    >
+                        <div className="flex items-center gap-2">
+                             {showMarkers ? <CheckSquare className="w-4 h-4 text-rose-800" /> : <Square className="w-4 h-4 text-slate-400" />}
+                             <span>Puntos (Coordenadas)</span>
+                        </div>
                     </button>
 
                     <button 
@@ -201,22 +228,11 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                              {showDrawing ? <CheckSquare className="w-4 h-4 text-blue-600" /> : <Square className="w-4 h-4 text-slate-400" />}
                              <span>Dibujo Actual</span>
                         </div>
-                        {points.length > 0 && (
-                            <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-xs font-mono">{points.length} pts</span>
-                        )}
                     </button>
                 </div>
             )}
         </div>
 
-        {/* Action Hint */}
-        {isAdmin && !isDrawing && (
-             <div className="bg-yellow-50 p-2 rounded-md shadow-lg border border-yellow-200 text-xs font-bold text-yellow-800 flex items-center gap-2">
-                <Edit3 className="w-4 h-4" />
-                Selecciona un área
-             </div>
-        )}
-        
         {/* Eraser Tool */}
         {points.length > 0 && isDrawing && showDrawing && (
           <button 

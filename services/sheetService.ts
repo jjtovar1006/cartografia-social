@@ -87,7 +87,6 @@ const requestWithFallback = async (endpoint: string, params: Record<string, any>
 
     } catch (error: any) {
         // Intento 2: Fallback a Conexión Directa
-        // Detectamos: API no encontrada (404), Error de Red (TypeError), o Respuesta HTML inválida (SyntaxError)
         const isFallbackNeeded = 
             error.message === 'API_NOT_FOUND' || 
             error.name === 'TypeError' || 
@@ -103,19 +102,22 @@ const requestWithFallback = async (endpoint: string, params: Record<string, any>
                             endpoint.includes('actualizar') ? 'actualizar' : null;
 
              if (action) {
-                 // GAS solo soporta GET y POST. Convertimos PUT a POST.
                  const scriptMethod = method === 'GET' ? 'GET' : 'POST';
-                 // Inyectamos 'action' en los parámetros para que el Script sepa qué hacer
-                 return await callScriptDirectly({ ...params, action }, scriptMethod);
+                 try {
+                    const result = await callScriptDirectly({ ...params, action }, scriptMethod);
+                    return result;
+                 } catch (fallbackError) {
+                    console.error("El fallback también falló:", fallbackError);
+                    throw fallbackError;
+                 }
              }
         }
-        // Si no es un error recuperable, lo lanzamos
         throw error;
     }
 }
 
 /**
- * Obtener estadísticas de comunidades
+ * Obtener estadísticas de comunidades con datos demo enriquecidos.
  */
 export const fetchCommunityStats = async (): Promise<CommunityStats[]> => {
   try {
@@ -126,16 +128,36 @@ export const fetchCommunityStats = async (): Promise<CommunityStats[]> => {
     return [];
   } catch (error) {
     console.warn("Error obteniendo stats, usando datos demo.", error);
+    // Datos Demo Enriquecidos con Geografía
     return [
-        { name: "Casco Central (Demo)", families: 45, population: 150 },
-        { name: "Sector Norte (Demo)", families: 32, population: 110 }
+        { 
+            name: "Casco Central", 
+            state: "Miranda", 
+            municipality: "Sucre", 
+            parish: "Petare", 
+            families: 45, 
+            population: 150 
+        },
+        { 
+            name: "Sector Norte", 
+            state: "Miranda", 
+            municipality: "Sucre", 
+            parish: "Leoncio Martínez", 
+            families: 32, 
+            population: 110 
+        },
+        { 
+            name: "La Candelaria", 
+            state: "Distrito Capital", 
+            municipality: "Libertador", 
+            parish: "La Candelaria", 
+            families: 60, 
+            population: 210 
+        }
     ];
   }
 };
 
-/**
- * Guardar nueva área
- */
 export const saveAreaToSheet = async (data: AreaRecord): Promise<boolean> => {
   try {
     await requestWithFallback(`${API_BASE_POLIGONO}/crear`, data, 'POST');
@@ -146,9 +168,6 @@ export const saveAreaToSheet = async (data: AreaRecord): Promise<boolean> => {
   }
 };
 
-/**
- * Listar áreas existentes
- */
 export const fetchAreasFromSheet = async (): Promise<AreaRecord[]> => {
   try {
     const data = await requestWithFallback(`${API_BASE_POLIGONO}/listar`, {}, 'GET');
@@ -162,9 +181,6 @@ export const fetchAreasFromSheet = async (): Promise<AreaRecord[]> => {
   }
 };
 
-/**
- * Actualizar área existente
- */
 export const updateAreaInSheet = async (data: Partial<AreaRecord> & { ID_AREA: string }): Promise<boolean> => {
   try {
     await requestWithFallback(`${API_BASE_POLIGONO}/actualizar`, data, 'PUT');

@@ -35,6 +35,27 @@ export const wktToPoints = (wkt: string): LatLng[] => {
   }
 };
 
+/**
+ * Calculates the centroid (approximate center) of a polygon.
+ * Used to place a marker on the map for the community.
+ */
+export const getPolygonCentroid = (points: LatLng[]): LatLng | null => {
+  if (!points || points.length === 0) return null;
+
+  let latSum = 0;
+  let lngSum = 0;
+
+  points.forEach(p => {
+    latSum += p.lat;
+    lngSum += p.lng;
+  });
+
+  return {
+    lat: latSum / points.length,
+    lng: lngSum / points.length
+  };
+};
+
 export const generateUniqueId = (): string => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();

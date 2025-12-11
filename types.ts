@@ -23,6 +23,9 @@ export interface LatLng {
 
 export interface CommunityStats {
   name: string;
+  state: string;        // Estado
+  municipality: string; // Municipio
+  parish: string;       // Parroquia
   families: number;
   population: number;
 }
