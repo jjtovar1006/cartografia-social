@@ -1,118 +1,163 @@
 import { AreaRecord, CommunityStats } from '../types';
 
-// Endpoints
+// URL del Script de Google Apps (Capa de Persistencia)
+// Esta URL se usa como respaldo si la API de Vercel no está disponible localmente.
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby-XbyZKagUuqLYo6BAo6KtzpKd2eCtEb2s_2lTp471Sexh8psqWf-coORQtlT4oKPm/exec";
+
+// Endpoints Locales (Vercel Functions)
 const API_BASE_POLIGONO = '/api/poligono';
 const API_STATS = '/api/stats';
 
 /**
- * Helper to safely parse JSON from a response
+ * Función para llamar directamente al Google Apps Script desde el navegador.
+ * Se usa cuando el entorno no tiene las Serverless Functions activas (ej: Vite local).
  */
-const safeRequest = async (url: string, options?: RequestInit): Promise<any> => {
-  try {
-    const response = await fetch(url, options);
-    
-    if (!response.ok) {
-        // Specifically handle 404 (Not Found) which usually means the backend function 
-        // isn't running or available in the current environment (e.g. local preview)
-        if (response.status === 404) {
-             console.warn(`API Not Found (${url}). Switching to local demo data.`);
-             throw new Error('API_NOT_FOUND');
-        }
-        
-        const text = await response.text();
-        console.warn(`API Error (${response.status}) for ${url}:`, text);
-        throw new Error(`Server Error ${response.status}`);
+const callScriptDirectly = async (params: Record<string, any>, method: 'GET' | 'POST' = 'GET'): Promise<any> => {
+    let url = APPS_SCRIPT_URL;
+    let options: RequestInit = {
+        method: method,
+    };
+
+    if (method === 'GET') {
+        const queryParams = new URLSearchParams(params).toString();
+        url = `${APPS_SCRIPT_URL}?${queryParams}`;
+    } else {
+        // TRUCO CLAVE: Google Apps Script maneja mejor las peticiones POST desde navegadores
+        // si el Content-Type es text/plain, evitando la pre-verificación OPTIONS (CORS strict).
+        options.body = JSON.stringify(params);
+        options.headers = {
+            'Content-Type': 'text/plain;charset=utf-8',
+        };
     }
 
-    const text = await response.text();
-    // Handle empty responses
-    if (!text.trim()) return null;
-    return JSON.parse(text);
-  } catch (error) {
-    // Re-throw if it's our custom error, otherwise log
-    if (error instanceof Error && error.message === 'API_NOT_FOUND') {
+    try {
+        const response = await fetch(url, options);
+        if (!response.ok) {
+             throw new Error(`Error en Script Directo: ${response.status}`);
+        }
+        const text = await response.text();
+        // Si el script devuelve vacío, asumimos éxito en operaciones de escritura
+        if (!text.trim()) return { success: true };
+        return JSON.parse(text);
+    } catch (error) {
+        console.error("Fallo en la llamada directa al script:", error);
         throw error;
     }
-    console.warn(`Request failed for ${url}:`, error);
-    throw error;
-  }
 };
 
 /**
- * Fetches stats for communities from CENSO_HOGARES
+ * Gestor de peticiones con estrategia de respaldo (Fallback).
+ * 1. Intenta llamar a la API local (/api/...).
+ * 2. Si falla (404 o Red), llama directamente al Google Script.
+ */
+const requestWithFallback = async (endpoint: string, params: Record<string, any>, method: 'GET' | 'POST' | 'PUT' = 'GET'): Promise<any> => {
+    try {
+        // Intento 1: API Local
+        let url = endpoint;
+        let options: RequestInit = {
+             method: method,
+             headers: { 'Content-Type': 'application/json' }
+        };
+        
+        if (method !== 'GET') {
+            options.body = JSON.stringify(params);
+        }
+
+        const response = await fetch(url, options);
+
+        // Si devuelve 404, es probable que estemos en local (Vite) sin backend corriendo.
+        // Lanzamos error para activar el catch y usar el fallback.
+        if (response.status === 404) {
+             throw new Error('API_NOT_FOUND');
+        }
+        
+        if (!response.ok) {
+             throw new Error(`Server Error ${response.status}`);
+        }
+
+        const text = await response.text();
+        return text ? JSON.parse(text) : null;
+
+    } catch (error: any) {
+        // Intento 2: Fallback a Conexión Directa
+        if (error.message === 'API_NOT_FOUND' || error.name === 'TypeError') { 
+             console.log(`⚠️ API Local no disponible (${endpoint}). Conectando directamente a Google Sheets...`);
+             
+             // Determinar la acción basada en el endpoint
+             const action = endpoint.includes('stats') ? 'stats' : 
+                            endpoint.includes('listar') ? 'listar' : 
+                            endpoint.includes('crear') ? 'crear' : 
+                            endpoint.includes('actualizar') ? 'actualizar' : null;
+
+             if (action) {
+                 // GAS solo soporta GET y POST. Convertimos PUT a POST.
+                 const scriptMethod = method === 'GET' ? 'GET' : 'POST';
+                 // Inyectamos 'action' en los parámetros para que el Script sepa qué hacer
+                 return await callScriptDirectly({ ...params, action }, scriptMethod);
+             }
+        }
+        // Si no es un error recuperable, lo lanzamos
+        throw error;
+    }
+}
+
+/**
+ * Obtener estadísticas de comunidades
  */
 export const fetchCommunityStats = async (): Promise<CommunityStats[]> => {
   try {
-    const data = await safeRequest(API_STATS);
+    const data = await requestWithFallback(API_STATS, {}, 'GET');
     if (Array.isArray(data)) {
         return data as CommunityStats[];
     }
     return [];
   } catch (error) {
-    // Return demo data if API fails (404, Network Error, etc)
+    console.warn("Error obteniendo stats, usando datos demo.", error);
     return [
         { name: "Casco Central (Demo)", families: 45, population: 150 },
-        { name: "Sector Norte (Demo)", families: 32, population: 110 },
-        { name: "Sector Sur (Demo)", families: 28, population: 95 }
+        { name: "Sector Norte (Demo)", families: 32, population: 110 }
     ];
   }
 };
 
 /**
- * Saves a new area to Google Sheets
+ * Guardar nueva área
  */
 export const saveAreaToSheet = async (data: AreaRecord): Promise<boolean> => {
   try {
-    await safeRequest(`${API_BASE_POLIGONO}/crear`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
+    await requestWithFallback(`${API_BASE_POLIGONO}/crear`, data, 'POST');
     return true;
   } catch (error) {
-    console.error("Failed to save area:", error);
+    console.error("Error al guardar área:", error);
     throw error;
   }
 };
 
 /**
- * Fetches all areas from Google Sheets
+ * Listar áreas existentes
  */
 export const fetchAreasFromSheet = async (): Promise<AreaRecord[]> => {
   try {
-    const data = await safeRequest(`${API_BASE_POLIGONO}/listar`);
-    
-    // Ensure we always return an array
+    const data = await requestWithFallback(`${API_BASE_POLIGONO}/listar`, {}, 'GET');
     if (Array.isArray(data)) {
       return data as AreaRecord[];
     }
-    
-    console.warn("API did not return an array:", data);
     return [];
   } catch (error) {
-    console.error("Failed to fetch areas:", error);
-    // Return empty array to allow the app to function (e.g. in offline/demo mode)
+    console.error("Error al listar áreas:", error);
     return [];
   }
 };
 
 /**
- * Updates an existing area
+ * Actualizar área existente
  */
 export const updateAreaInSheet = async (data: Partial<AreaRecord> & { ID_AREA: string }): Promise<boolean> => {
   try {
-    await safeRequest(`${API_BASE_POLIGONO}/actualizar`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
+    await requestWithFallback(`${API_BASE_POLIGONO}/actualizar`, data, 'PUT');
     return true;
   } catch (error) {
-    console.error("Failed to update area:", error);
+    console.error("Error al actualizar área:", error);
     throw error;
   }
 };
