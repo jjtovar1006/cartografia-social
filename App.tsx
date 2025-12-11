@@ -24,12 +24,15 @@ function App() {
   // Edit Mode State
   const [editingId, setEditingId] = useState<string | null>(null);
   
-  // Form State
+  // Form State Updated with Geography
   const [formData, setFormData] = useState({
     community: '',
     name: '',
     type: AreaType.LIMITE_COMUNAL,
-    user: ''
+    user: '',
+    state: '',
+    municipality: '',
+    parish: ''
   });
 
   // Load stats on mount
@@ -44,12 +47,19 @@ function App() {
     }
   }, [view]);
 
-  // When community changes via dashboard, update form default
+  // When community changes via dashboard, update form default and try to pre-fill geography from stats
   useEffect(() => {
     if (selectedCommunity) {
-      setFormData(prev => ({ ...prev, community: selectedCommunity }));
+      const statMatch = communityStats.find(s => s.name === selectedCommunity);
+      setFormData(prev => ({ 
+          ...prev, 
+          community: selectedCommunity,
+          state: statMatch?.state || '',
+          municipality: statMatch?.municipality || '',
+          parish: statMatch?.parish || ''
+      }));
     }
-  }, [selectedCommunity]);
+  }, [selectedCommunity, communityStats]);
 
   const loadStats = async () => {
     setIsLoadingStats(true);
@@ -87,11 +97,18 @@ function App() {
     setPoints([]);
     setIsDrawing(false);
     setEditingId(null); // Exit edit mode
+    
+    // Reset form but keep geography if community is selected
+    const statMatch = selectedCommunity ? communityStats.find(s => s.name === selectedCommunity) : null;
+    
     setFormData({
       community: selectedCommunity || '',
       name: '',
       type: AreaType.LIMITE_COMUNAL,
-      user: ''
+      user: '',
+      state: statMatch?.state || '',
+      municipality: statMatch?.municipality || '',
+      parish: statMatch?.parish || ''
     });
   };
 
@@ -121,7 +138,10 @@ function App() {
             community: poly.COMUNIDAD_ASOCIADA,
             name: poly.NOMBRE_AREA,
             type: poly.TIPO_AREA,
-            user: poly.USUARIO_WKT
+            user: poly.USUARIO_WKT,
+            state: poly.ESTADO || '',
+            municipality: poly.MUNICIPIO || '',
+            parish: poly.PARROQUIA || ''
         });
 
         // 2. Convert WKT to points for the map editor
@@ -145,7 +165,10 @@ function App() {
             NOMBRE_AREA: formData.name,
             GEOMETRIA_WKT: pointsToWKT(points),
             FECHA_ACTUALIZACION: getCurrentDateTime(),
-            USUARIO_WKT: formData.user
+            USUARIO_WKT: formData.user,
+            ESTADO: formData.state,
+            MUNICIPIO: formData.municipality,
+            PARROQUIA: formData.parish
         };
 
         if (editingId) {

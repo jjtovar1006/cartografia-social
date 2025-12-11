@@ -1,6 +1,6 @@
 import React from 'react';
 import { AreaType, LatLng } from '../types';
-import { Save, Map, Trash2, CheckCircle, Edit, AlertCircle } from 'lucide-react';
+import { Save, Map, Trash2, CheckCircle, Edit, AlertCircle, MapPin } from 'lucide-react';
 
 interface AreaFormProps {
   formData: {
@@ -8,6 +8,9 @@ interface AreaFormProps {
     name: string;
     type: AreaType;
     user: string;
+    state: string;
+    municipality: string;
+    parish: string;
   };
   setFormData: (data: any) => void;
   points: LatLng[];
@@ -65,12 +68,55 @@ const AreaForm: React.FC<AreaFormProps> = ({
         </p>
       </div>
 
-      <div className="space-y-4 flex-1 overflow-y-auto">
+      <div className="space-y-4 flex-1 overflow-y-auto pr-2">
         
+        {/* Sección Geografía Política */}
+        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-3">
+             <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
+                 <MapPin size={12} /> Ubicación Política
+             </div>
+             
+             <div className="grid grid-cols-2 gap-3">
+                {/* Estado */}
+                <div className="col-span-2">
+                    <input
+                        type="text"
+                        name="state"
+                        value={formData.state}
+                        onChange={handleChange}
+                        placeholder="Estado (Ej: Miranda)"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                </div>
+                {/* Municipio */}
+                <div>
+                    <input
+                        type="text"
+                        name="municipality"
+                        value={formData.municipality}
+                        onChange={handleChange}
+                        placeholder="Municipio"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                </div>
+                {/* Parroquia */}
+                <div>
+                    <input
+                        type="text"
+                        name="parish"
+                        value={formData.parish}
+                        onChange={handleChange}
+                        placeholder="Parroquia"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                </div>
+             </div>
+        </div>
+
         {/* Community Field */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
-            Comunidad *
+            Comunidad / Consejo Comunal *
           </label>
           <input
             type="text"
@@ -78,14 +124,14 @@ const AreaForm: React.FC<AreaFormProps> = ({
             value={formData.community}
             onChange={handleChange}
             placeholder="Ej: Casco Central"
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-semibold"
           />
         </div>
 
         {/* Name Field */}
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
-            Nombre del Área *
+            Nombre del Área (Polígono) *
           </label>
           <input
             type="text"

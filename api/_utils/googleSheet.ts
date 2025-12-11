@@ -68,18 +68,21 @@ export const fetchFromScript = async (params: Record<string, any>, method: 'GET'
                 resolve({ success: true });
                 return;
             }
-            const json = JSON.parse(data);
-            resolve(json);
-          } catch (e) {
-            console.error("Invalid JSON from Script:", data);
-            // If the script returns HTML (e.g. error page or Google login), log it clearly
+            
+            // DETECTAR RESPUESTA HTML (Error de permisos o Auth)
             if (data.includes("<!DOCTYPE html>") || data.includes("<html")) {
                 const titleMatch = data.match(/<title>(.*?)<\/title>/);
                 const title = titleMatch ? titleMatch[1] : "Unknown HTML Page";
-                reject(new Error(`Google Script returned HTML (${title}) instead of JSON. The script might be restricted or asking for login.`));
-            } else {
-                reject(new Error(`Invalid response format from Google Script: ${data.substring(0, 100)}...`));
+                console.error("Google Script returned HTML instead of JSON:", title);
+                reject(new Error(`Google Script returned HTML (${title}). Check Script Permissions (must be 'Anyone').`));
+                return;
             }
+
+            const json = JSON.parse(data);
+            resolve(json);
+          } catch (e) {
+            console.error("Invalid JSON from Script:", data.substring(0, 100));
+            reject(new Error(`Invalid response format from Google Script: ${data.substring(0, 50)}...`));
           }
         });
       });

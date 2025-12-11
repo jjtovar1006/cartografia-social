@@ -47,7 +47,7 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   const [isLayersMenuOpen, setIsLayersMenuOpen] = useState(false);
 
   useEffect(() => {
-    // Si hay polígonos existentes, centrar en el primero
+    // Si hay polígonos existentes, centrar en el primero para mejor UX
     if (existingPolygons.length > 0) {
         const firstPoly = wktToPoints(existingPolygons[0].GEOMETRIA_WKT);
         if (firstPoly.length > 0) {
@@ -115,22 +115,34 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                         }
                     }}
                     >
-                        <Tooltip sticky direction="top">
+                        <Tooltip sticky direction="top" opacity={0.9}>
                             <span className="font-bold text-rose-900">{poly.NOMBRE_AREA}</span>
                         </Tooltip>
                     </Polygon>
                 )}
 
-                {/* B. MARKERS LAYER (Points of Coordinates) */}
+                {/* B. MARKERS LAYER (Points of Coordinates per Community) */}
                 {showMarkers && centroid && !isDrawing && (
                     <Marker position={[centroid.lat, centroid.lng]}>
                         <Popup>
-                            <div className="text-sm min-w-[150px]">
-                                <strong className="block text-rose-900 border-b border-rose-100 pb-1 mb-1 text-base">{poly.NOMBRE_AREA}</strong>
-                                <span className="text-slate-600 font-medium block">{poly.TIPO_AREA}</span>
-                                <span className="text-xs text-slate-500 block mt-1">Comunidad: {poly.COMUNIDAD_ASOCIADA}</span>
-                                <div className="mt-2 text-xs text-slate-400 font-mono bg-slate-50 p-1 rounded">
-                                    {centroid.lat.toFixed(5)}, {centroid.lng.toFixed(5)}
+                            <div className="text-sm min-w-[150px] p-1">
+                                <div className="flex items-center gap-2 mb-2 border-b border-rose-100 pb-2">
+                                    <MapPin size={16} className="text-rose-800" />
+                                    <strong className="block text-rose-900 text-base">{poly.NOMBRE_AREA}</strong>
+                                </div>
+                                
+                                <span className="inline-block bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full mb-2 font-medium border border-blue-100">
+                                    {poly.TIPO_AREA}
+                                </span>
+                                
+                                <div className="space-y-1">
+                                    <div className="text-xs text-slate-500">
+                                        <span className="font-semibold text-slate-700">Comunidad:</span> {poly.COMUNIDAD_ASOCIADA}
+                                    </div>
+                                    <div className="text-xs text-slate-500 font-mono bg-slate-50 p-1.5 rounded border border-slate-100 flex items-center justify-between">
+                                        <span>Lat: {centroid.lat.toFixed(5)}</span>
+                                        <span>Lng: {centroid.lng.toFixed(5)}</span>
+                                    </div>
                                 </div>
                             </div>
                         </Popup>
@@ -168,8 +180,8 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
       <div className="absolute top-4 right-4 z-[1000] flex flex-col items-end gap-2">
         
         {/* Status Badge */}
-        <div className={`p-2 rounded-md shadow-lg border text-xs font-medium flex items-center gap-2 ${
-            isDrawing ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-white border-slate-200 text-slate-600'
+        <div className={`p-2 rounded-md shadow-lg border text-xs font-medium flex items-center gap-2 backdrop-blur-sm ${
+            isDrawing ? 'bg-blue-50/90 border-blue-200 text-blue-800' : 'bg-white/90 border-slate-200 text-slate-600'
         }`}>
            {isDrawing ? (
              <>
@@ -188,14 +200,14 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
         <div className="relative">
             <button 
                 onClick={() => setIsLayersMenuOpen(!isLayersMenuOpen)}
-                className="bg-white p-2 rounded-md shadow-lg border border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+                className="bg-white/90 p-2 rounded-md shadow-lg border border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors backdrop-blur-sm"
                 title="Control de Capas"
             >
                 <Layers className="w-5 h-5" />
             </button>
             
             {isLayersMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-lg shadow-xl border border-slate-200 p-3 flex flex-col gap-2 animate-in fade-in zoom-in-95 duration-200">
+                <div className="absolute right-0 top-full mt-2 w-56 bg-white/95 backdrop-blur-md rounded-lg shadow-xl border border-slate-200 p-3 flex flex-col gap-2 animate-in fade-in zoom-in-95 duration-200">
                     <div className="flex justify-between items-center border-b border-slate-100 pb-2 mb-1">
                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Capas Visibles</span>
                     </div>

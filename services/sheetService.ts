@@ -1,7 +1,7 @@
 import { AreaRecord, CommunityStats } from '../types';
 
 // URL del Script de Google Apps (Capa de Persistencia)
-// Esta URL se usa como respaldo si la API de Vercel no está disponible localmente.
+// Esta URL se usa como respaldo si la API de Vercel no está disponible localmente o falla.
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby-XbyZKagUuqLYo6BAo6KtzpKd2eCtEb2s_2lTp471Sexh8psqWf-coORQtlT4oKPm/exec";
 
 // Endpoints Locales (Vercel Functions)
@@ -10,7 +10,7 @@ const API_STATS = '/api/stats';
 
 /**
  * Función para llamar directamente al Google Apps Script desde el navegador.
- * Se usa cuando el entorno no tiene las Serverless Functions activas (ej: Vite local).
+ * Se usa cuando el entorno no tiene las Serverless Functions activas (ej: Vite local) o fallan.
  */
 const callScriptDirectly = async (params: Record<string, any>, method: 'GET' | 'POST' = 'GET'): Promise<any> => {
     let url = APPS_SCRIPT_URL;
@@ -55,7 +55,7 @@ const callScriptDirectly = async (params: Record<string, any>, method: 'GET' | '
 /**
  * Gestor de peticiones con estrategia de respaldo (Fallback).
  * 1. Intenta llamar a la API local (/api/...).
- * 2. Si falla (404, Red, o JSON inválido), llama directamente al Google Script.
+ * 2. Si falla (404, 500, Red, o JSON inválido), llama directamente al Google Script.
  */
 const requestWithFallback = async (endpoint: string, params: Record<string, any>, method: 'GET' | 'POST' | 'PUT' = 'GET'): Promise<any> => {
     try {
@@ -77,29 +77,33 @@ const requestWithFallback = async (endpoint: string, params: Record<string, any>
              throw new Error('API_NOT_FOUND');
         }
         
+        // Si devuelve 500 (Internal Server Error), probablemente la API de Vercel falló al conectar con Google.
         if (!response.ok) {
              throw new Error(`Server Error ${response.status}`);
         }
 
         const text = await response.text();
-        // Si devuelve HTML (ej: index.html de Vite), JSON.parse fallará
+        // Si devuelve HTML (ej: index.html de Vite o error Vercel), JSON.parse fallará
         return text ? JSON.parse(text) : null;
 
     } catch (error: any) {
         // Intento 2: Fallback a Conexión Directa
+        // Activamos fallback para casi cualquier error de la API intermedia (404, 500, Parse Error)
         const isFallbackNeeded = 
             error.message === 'API_NOT_FOUND' || 
+            (error.message && error.message.includes('Server Error')) ||
             error.name === 'TypeError' || 
             error instanceof SyntaxError;
 
         if (isFallbackNeeded) { 
-             console.log(`⚠️ Sincronización Local: API no disponible (${endpoint}). Conectando directo a Google Sheets...`);
+             console.log(`⚠️ Sincronización Local/Fallback: API no disponible o falló (${endpoint}). Conectando directo a Google Sheets...`);
              
              // Determinar la acción basada en el endpoint
-             const action = endpoint.includes('stats') ? 'stats' : 
-                            endpoint.includes('listar') ? 'listar' : 
-                            endpoint.includes('crear') ? 'crear' : 
-                            endpoint.includes('actualizar') ? 'actualizar' : null;
+             let action = null;
+             if (endpoint.includes('stats')) action = 'stats';
+             else if (endpoint.includes('listar')) action = 'listar';
+             else if (endpoint.includes('crear')) action = 'crear';
+             else if (endpoint.includes('actualizar')) action = 'actualizar';
 
              if (action) {
                  const scriptMethod = method === 'GET' ? 'GET' : 'POST';
@@ -112,12 +116,13 @@ const requestWithFallback = async (endpoint: string, params: Record<string, any>
                  }
              }
         }
+        // Si no es un error recuperable, o el fallback no se pudo ejecutar, lanzamos el original
         throw error;
     }
 }
 
 /**
- * Obtener estadísticas de comunidades con datos demo enriquecidos.
+ * Obtener estadísticas de comunidades
  */
 export const fetchCommunityStats = async (): Promise<CommunityStats[]> => {
   try {
@@ -128,7 +133,7 @@ export const fetchCommunityStats = async (): Promise<CommunityStats[]> => {
     return [];
   } catch (error) {
     console.warn("Error obteniendo stats, usando datos demo.", error);
-    // Datos Demo Enriquecidos con Geografía
+    // Datos Demo Enriquecidos con Geografía para visualización en caso de error
     return [
         { 
             name: "Casco Central", 
@@ -158,6 +163,9 @@ export const fetchCommunityStats = async (): Promise<CommunityStats[]> => {
   }
 };
 
+/**
+ * Guardar nueva área
+ */
 export const saveAreaToSheet = async (data: AreaRecord): Promise<boolean> => {
   try {
     await requestWithFallback(`${API_BASE_POLIGONO}/crear`, data, 'POST');
@@ -168,6 +176,9 @@ export const saveAreaToSheet = async (data: AreaRecord): Promise<boolean> => {
   }
 };
 
+/**
+ * Listar áreas existentes
+ */
 export const fetchAreasFromSheet = async (): Promise<AreaRecord[]> => {
   try {
     const data = await requestWithFallback(`${API_BASE_POLIGONO}/listar`, {}, 'GET');
@@ -181,6 +192,9 @@ export const fetchAreasFromSheet = async (): Promise<AreaRecord[]> => {
   }
 };
 
+/**
+ * Actualizar área existente
+ */
 export const updateAreaInSheet = async (data: Partial<AreaRecord> & { ID_AREA: string }): Promise<boolean> => {
   try {
     await requestWithFallback(`${API_BASE_POLIGONO}/actualizar`, data, 'PUT');

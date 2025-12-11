@@ -14,6 +14,10 @@ export interface AreaRecord {
   GEOMETRIA_WKT: string; // The polygon string: POLYGON((x y, x y...))
   FECHA_ACTUALIZACION: string;
   USUARIO_WKT: string;
+  // Nuevos campos geográficos
+  ESTADO?: string;
+  MUNICIPIO?: string;
+  PARROQUIA?: string;
 }
 
 export interface LatLng {
