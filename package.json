@@ -2,6 +2,9 @@
   "name": "social-cartography",
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "start": "vite",
     "build": "vite build",
