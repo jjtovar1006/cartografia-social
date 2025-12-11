@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { CommunityStats } from '../types';
-import { Users, Home, MapPin, ChevronRight, Activity, Flag, Search, Filter, Map } from 'lucide-react';
+import { Users, Home, MapPin, ChevronRight, Activity, Flag, Search, Filter, Map, AlertCircle } from 'lucide-react';
 
 interface DashboardProps {
   stats: CommunityStats[];
@@ -149,9 +149,10 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onSelectCommunity, isLoadi
                     <select 
                         value={selectedState} 
                         onChange={handleStateChange}
-                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none appearance-none cursor-pointer"
+                        disabled={states.length === 0}
+                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none appearance-none cursor-pointer disabled:opacity-50"
                     >
-                        <option value="">Todos los Estados</option>
+                        <option value="">{states.length === 0 && !isLoading ? "Sin datos cargados" : "Todos los Estados"}</option>
                         {states.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                     <ChevronRight className="w-4 h-4 text-slate-400 absolute right-3 top-3 rotate-90 pointer-events-none" />
@@ -206,6 +207,18 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onSelectCommunity, isLoadi
                 </div>
              </div>
         </div>
+        
+        {/* Mensaje de Debug si no hay filtros */}
+        {states.length === 0 && !isLoading && stats.length > 0 && (
+             <div className="mt-4 p-3 bg-yellow-50 text-yellow-800 text-xs rounded border border-yellow-200 flex items-center gap-2">
+                 <AlertCircle size={14} />
+                 <span>
+                     <strong>Atención:</strong> Se encontraron datos de comunidades, pero no se detectaron Estados ni Municipios. 
+                     Verifique que las columnas en su hoja de cálculo se llamen exactamente 
+                     <code>ESTADO</code>, <code>MUNICIPIO</code>, <code>PARROQUIA</code> (sin espacios extra).
+                 </span>
+             </div>
+        )}
       </section>
 
       {/* 3. LISTADO DE COMUNIDADES (Solo visible al filtrar) */}

@@ -213,12 +213,8 @@ export const updateAreaInSheet = async (data: Partial<AreaRecord> & { ID_AREA: s
  */
 export const saveHouseholdToSheet = async (data: HouseholdRecord): Promise<boolean> => {
     try {
-      // Map 'ESTADO' from Typescript interface to 'ESTDO' for Google Script
-      const payload = {
-          ...data,
-          ESTDO: data.ESTADO
-      };
-      await requestWithFallback(`${API_BASE_HOGAR}/crear`, payload, 'POST');
+      // El script actualizado ya maneja 'ESTADO' correctamente y unifica 'COORDENADAS'
+      await requestWithFallback(`${API_BASE_HOGAR}/crear`, data, 'POST');
       return true;
     } catch (error) {
       console.error("Failed to save household:", error);

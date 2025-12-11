@@ -1,14 +1,14 @@
 /**
  * ==========================================
- * CARTOGRAFÍA SOCIAL - BACKEND SCRIPT
+ * CARTOGRAFÍA SOCIAL - BACKEND SCRIPT (V3 ROBUSTO)
  * ==========================================
- * Copia y pega este código en: extensions > Apps Script
- * dentro de tu Google Sheet.
- * 
- * HOJAS REQUERIDAS:
- * 1. "POLIGONOS"
- * 2. "HOGARES" (Se crea automáticamente con la estructura solicitada)
+ * - Normaliza nombres de columnas (quita espacios y pone mayúsculas).
+ * - Maneja errores de datos vacíos.
  */
+
+// CONFIGURACIÓN DE NOMBRES DE HOJAS
+const SHEET_AREAS = "CARTOGRAFIA_AREAS";
+const SHEET_HOGARES = "CENSO_HOGARES";
 
 function doGet(e) {
   return handleRequest(e);
@@ -36,14 +36,14 @@ function handleRequest(e) {
     var result = {};
 
     // =========================================================
-    // ACCIONES DE POLÍGONOS (ÁREAS)
+    // ACCIONES DE POLÍGONOS (CARTOGRAFIA_AREAS)
     // =========================================================
     if (action === "listar") {
-      var sheet = getOrCreateSheet(ss, "POLIGONOS");
+      var sheet = getOrCreateSheet(ss, SHEET_AREAS);
       result = getSheetData(sheet);
     
     } else if (action === "crear") {
-      var sheet = getOrCreateSheet(ss, "POLIGONOS");
+      var sheet = getOrCreateSheet(ss, SHEET_AREAS);
       sheet.appendRow([
         params.ID_AREA,
         params.COMUNIDAD_ASOCIADA,
@@ -59,7 +59,7 @@ function handleRequest(e) {
       result = { success: true, message: "Área creada" };
 
     } else if (action === "actualizar") {
-      var sheet = getOrCreateSheet(ss, "POLIGONOS");
+      var sheet = getOrCreateSheet(ss, SHEET_AREAS);
       updateRowById(sheet, params.ID_AREA, [
         params.ID_AREA,
         params.COMUNIDAD_ASOCIADA,
@@ -75,28 +75,48 @@ function handleRequest(e) {
       result = { success: true, message: "Área actualizada" };
 
     // =========================================================
-    // ACCIONES DE HOGARES (CENSO)
+    // ACCIONES DE HOGARES (CENSO_HOGARES)
     // =========================================================
     } else if (action === "listar_hogares") {
-      var sheet = getOrCreateSheet(ss, "HOGARES");
-      result = getSheetData(sheet);
+      var sheet = getOrCreateSheet(ss, SHEET_HOGARES);
+      var rawData = getSheetData(sheet);
+      
+      // Separar lat/lng para que el mapa lo entienda
+      result = rawData.map(function(row) {
+        var lat = 0;
+        var lng = 0;
+        
+        // Buscar columna COORDENADAS (normalizada)
+        var coords = row['COORDENADAS'];
+        
+        if (coords) {
+          var parts = coords.toString().split(',');
+          if (parts.length >= 2) {
+             lat = parseFloat(parts[0].trim());
+             lng = parseFloat(parts[1].trim());
+          }
+        } 
+        
+        // Asignar al objeto de respuesta
+        row['COORDENADA_LAT'] = lat;
+        row['COORDENADA_LONG'] = lng;
+        return row;
+      });
 
     } else if (action === "registrar_hogar") {
-      var sheet = getOrCreateSheet(ss, "HOGARES");
-      // Orden solicitado estrictamente: 
-      // ID_HOGAR, FECHA_CENSO, USUARIO_APP, ESTDO, MUNICIPIO, PARROQUIA, 
-      // COMUNIDAD, COORDENADA_LAT, COORDENADA_LONG, DIRECCION_REF, 
-      // NOMBRE_JEFE_FAMILIA, NUM_MIEMBROS, TIPO_VIVIENDA
+      var sheet = getOrCreateSheet(ss, SHEET_HOGARES);
+      var coordsString = params.COORDENADA_LAT + ", " + params.COORDENADA_LONG;
+
+      // Nota: Aquí asumimos el orden de columnas fijo para escritura
       sheet.appendRow([
         params.ID_HOGAR,
         params.FECHA_CENSO || new Date().toISOString(),
         params.USUARIO_APP,
-        params.ESTDO || params.ESTADO, // Soporta ambos por si acaso
+        params.ESTADO,
         params.MUNICIPIO,
         params.PARROQUIA,
         params.COMUNIDAD,
-        params.COORDENADA_LAT,
-        params.COORDENADA_LONG,
+        coordsString,
         params.DIRECCION_REF,
         params.NOMBRE_JEFE_FAMILIA,
         params.NUM_MIEMBROS,
@@ -105,71 +125,66 @@ function handleRequest(e) {
       result = { success: true, message: "Hogar registrado" };
 
     // =========================================================
-    // ESTADÍSTICAS (INTEGRADO)
+    // ESTADÍSTICAS (PARA LOS FILTROS DEL DASHBOARD)
     // =========================================================
     } else if (action === "stats") {
       var stats = {};
 
-      // 1. Procesar Polígonos para estructura base
-      var polySheet = ss.getSheetByName("POLIGONOS");
-      if (polySheet) {
-        var polyData = polySheet.getDataRange().getValues();
-        for (var i = 1; i < polyData.length; i++) {
-          var comm = polyData[i][1]; // COMUNIDAD_ASOCIADA
-          if (!comm) continue;
-          
-          if (!stats[comm]) {
-            stats[comm] = { 
-              name: comm, 
-              families: 0, 
-              population: 0, 
-              areas: 0,
-              state: polyData[i][7],
-              municipality: polyData[i][8],
-              parish: polyData[i][9]
-            };
-          }
-          stats[comm].areas += 1;
-        }
+      // 1. Leer Hogares (Fuente principal de demografía y UBICACIÓN)
+      var homeSheet = ss.getSheetByName(SHEET_HOGARES);
+      if (homeSheet) {
+        var homeData = getSheetData(homeSheet);
+        
+        homeData.forEach(function(row) {
+           // Usamos claves normalizadas (Mayúsculas)
+           var comm = row['COMUNIDAD']; 
+           if (!comm) return;
+
+           // Normalizar nombre de comunidad para evitar duplicados por espacios
+           comm = comm.toString().trim();
+
+           if (!stats[comm]) {
+             stats[comm] = {
+                name: comm,
+                families: 0,
+                population: 0,
+                areas: 0,
+                // Asegurar que leemos las columnas políticas correctamente
+                state: (row['ESTADO'] || "").toString().trim(),
+                municipality: (row['MUNICIPIO'] || "").toString().trim(),
+                parish: (row['PARROQUIA'] || "").toString().trim()
+             };
+           }
+           
+           stats[comm].families += 1;
+           stats[comm].population += (parseInt(row['NUM_MIEMBROS']) || 0);
+        });
       }
 
-      // 2. Procesar Hogares para datos demográficos reales
-      var homeSheet = ss.getSheetByName("HOGARES");
-      if (homeSheet) {
-        var homeData = homeSheet.getDataRange().getValues();
-        // Indices basados en el orden de creación (ver getOrCreateSheet)
-        // 0:ID_HOGAR, 1:FECHA_CENSO, 2:USUARIO_APP, 3:ESTDO, 4:MUNICIPIO, 5:PARROQUIA, 
-        // 6:COMUNIDAD, 7:LAT, 8:LONG, 9:DIR, 10:JEFE, 11:MIEMBROS, 12:TIPO
-        
-        for (var i = 1; i < homeData.length; i++) {
-          var comm = homeData[i][6];
-          var members = parseInt(homeData[i][11]) || 0;
+      // 2. Leer Polígonos (para saber si ya están dibujados)
+      var polySheet = ss.getSheetByName(SHEET_AREAS);
+      if (polySheet) {
+        var polyData = getSheetData(polySheet);
+        polyData.forEach(function(row) {
+           var comm = row['COMUNIDAD_ASOCIADA'];
+           if (!comm) return;
+           comm = comm.toString().trim();
 
-          if (comm) {
-             if (!stats[comm]) {
-               // Si la comunidad tiene censo pero no polígono
-               stats[comm] = {
-                 name: comm,
-                 families: 0,
-                 population: 0,
-                 areas: 0,
-                 state: homeData[i][3], // Columna ESTDO
-                 municipality: homeData[i][4],
-                 parish: homeData[i][5]
-               };
-             }
-             stats[comm].families += 1; // 1 Fila = 1 Hogar
-             stats[comm].population += members;
-          }
-        }
-      } else {
-        // Fallback demo solo si NO existe la hoja de hogares (inicio del proyecto)
-        if (polySheet) {
-           for (var key in stats) {
-             stats[key].families = 15 * stats[key].areas; // Estimación dummy
-             stats[key].population = 45 * stats[key].areas;
+           if (stats[comm]) {
+             stats[comm].areas += 1;
+           } else {
+             // Si existe el polígono pero no hay censo aún, lo agregamos también
+             stats[comm] = {
+                name: comm,
+                families: 0,
+                population: 0,
+                areas: 1,
+                state: (row['ESTADO'] || "").toString().trim(),
+                municipality: (row['MUNICIPIO'] || "").toString().trim(),
+                parish: (row['PARROQUIA'] || "").toString().trim()
+             };
            }
-        }
+        });
       }
 
       result = Object.values(stats);
@@ -186,43 +201,35 @@ function handleRequest(e) {
   }
 }
 
-// Helpers
+// Helpers Genéricos
 function getOrCreateSheet(ss, name) {
   var sheet = ss.getSheetByName(name);
   if (!sheet) {
     sheet = ss.insertSheet(name);
-    if (name === "POLIGONOS") {
-      sheet.appendRow(["ID_AREA", "COMUNIDAD_ASOCIADA", "TIPO_AREA", "NOMBRE_AREA", "GEOMETRIA_WKT", "FECHA_ACTUALIZACION", "USUARIO_WKT", "ESTADO", "MUNICIPIO", "PARROQUIA"]);
-    } else if (name === "HOGARES") {
-      // Estructura solicitada
-      sheet.appendRow([
-        "ID_HOGAR", 
-        "FECHA_CENSO", 
-        "USUARIO_APP", 
-        "ESTDO", 
-        "MUNICIPIO", 
-        "PARROQUIA", 
-        "COMUNIDAD", 
-        "COORDENADA_LAT", 
-        "COORDENADA_LONG", 
-        "DIRECCION_REF", 
-        "NOMBRE_JEFE_FAMILIA", 
-        "NUM_MIEMBROS", 
-        "TIPO_VIVIENDA"
-      ]);
-    }
   }
   return sheet;
 }
 
+// FUNCIÓN CLAVE: Lee datos y NORMALIZA los encabezados a MAYÚSCULAS y SIN ESPACIOS
 function getSheetData(sheet) {
   var data = sheet.getDataRange().getValues();
+  if (data.length < 1) return [];
+  
   var headers = data[0];
+  // Normalizar headers: "  Estado " -> "ESTADO"
+  var cleanHeaders = headers.map(function(h) {
+    return h.toString().trim().toUpperCase();
+  });
+
   var rows = [];
   for (var i = 1; i < data.length; i++) {
     var row = {};
-    for (var j = 0; j < headers.length; j++) {
-      row[headers[j]] = data[i][j];
+    for (var j = 0; j < cleanHeaders.length; j++) {
+      var key = cleanHeaders[j];
+      // Solo agregamos si hay clave (evitar columnas vacías)
+      if (key) {
+        row[key] = data[i][j];
+      }
     }
     rows.push(row);
   }
