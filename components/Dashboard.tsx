@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { CommunityStats } from '../types';
-import { Users, Home, MapPin, ChevronRight, Activity, Flag, Search, Filter, Map, AlertCircle } from 'lucide-react';
+import { Users, Home, MapPin, ChevronRight, Activity, Flag, Search, Filter, Map, AlertCircle, Database, X } from 'lucide-react';
 
 interface DashboardProps {
   stats: CommunityStats[];
@@ -14,38 +14,53 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onSelectCommunity, isLoadi
   const [selectedMunicipality, setSelectedMunicipality] = useState<string>('');
   const [selectedParish, setSelectedParish] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  
+  // Debug State
+  const [showDebug, setShowDebug] = useState(false);
 
-  // 1. Obtener listas únicas para los selectores
-  const states = useMemo(() => Array.from(new Set(stats.map(s => s.state).filter(Boolean))), [stats]);
+  // 1. Obtener listas únicas para los selectores (Manejo de vacíos)
+  const states = useMemo(() => {
+      const s = new Set(stats.map(st => st.state ? st.state : "Sin Información"));
+      return Array.from(s).sort();
+  }, [stats]);
   
   const municipalities = useMemo(() => {
     return Array.from(new Set(
         stats
-        .filter(s => !selectedState || s.state === selectedState)
-        .map(s => s.municipality)
-        .filter(Boolean)
-    ));
+        .filter(s => {
+            const sState = s.state || "Sin Información";
+            return !selectedState || sState === selectedState;
+        })
+        .map(s => s.municipality || "Sin Información")
+    )).sort();
   }, [stats, selectedState]);
 
   const parishes = useMemo(() => {
     return Array.from(new Set(
         stats
-        .filter(s => (!selectedState || s.state === selectedState) && 
-                     (!selectedMunicipality || s.municipality === selectedMunicipality))
-        .map(s => s.parish)
-        .filter(Boolean)
-    ));
+        .filter(s => {
+            const sState = s.state || "Sin Información";
+            const sMuni = s.municipality || "Sin Información";
+            return (!selectedState || sState === selectedState) && 
+                   (!selectedMunicipality || sMuni === selectedMunicipality);
+        })
+        .map(s => s.parish || "Sin Información")
+    )).sort();
   }, [stats, selectedState, selectedMunicipality]);
 
   // 2. Filtrar las comunidades
   const filteredStats = useMemo(() => {
     return stats.filter(community => {
-        const matchState = !selectedState || community.state === selectedState;
-        const matchMuni = !selectedMunicipality || community.municipality === selectedMunicipality;
-        const matchParish = !selectedParish || community.parish === selectedParish;
+        const cState = community.state || "Sin Información";
+        const cMuni = community.municipality || "Sin Información";
+        const cParish = community.parish || "Sin Información";
+
+        const matchState = !selectedState || cState === selectedState;
+        const matchMuni = !selectedMunicipality || cMuni === selectedMunicipality;
+        const matchParish = !selectedParish || cParish === selectedParish;
         const matchSearch = !searchTerm || 
                             community.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            community.municipality?.toLowerCase().includes(searchTerm.toLowerCase());
+                            (community.municipality || '').toLowerCase().includes(searchTerm.toLowerCase());
         return matchState && matchMuni && matchParish && matchSearch;
     });
   }, [stats, selectedState, selectedMunicipality, selectedParish, searchTerm]);
@@ -136,10 +151,32 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onSelectCommunity, isLoadi
 
       {/* 2. SECCIÓN DE BÚSQUEDA Y FILTRO JERÁRQUICO */}
       <section className="bg-white rounded-2xl shadow-md border border-slate-200 p-6">
-        <div className="flex items-center gap-2 mb-4 text-rose-900 border-b border-rose-100 pb-3">
-             <Filter className="w-5 h-5" />
-             <h2 className="font-bold text-lg">Buscador y Filtros Territoriales</h2>
+        <div className="flex items-center justify-between mb-4 border-b border-rose-100 pb-3">
+             <div className="flex items-center gap-2 text-rose-900">
+                <Filter className="w-5 h-5" />
+                <h2 className="font-bold text-lg">Buscador y Filtros Territoriales</h2>
+             </div>
+             <button 
+                onClick={() => setShowDebug(!showDebug)}
+                className="text-xs text-slate-400 hover:text-rose-600 flex items-center gap-1 transition-colors"
+                title="Herramienta de diagnóstico"
+             >
+                <Database size={12} /> {showDebug ? 'Ocultar Datos' : 'Ver Datos Crudos'}
+             </button>
         </div>
+
+        {/* DEBUG PANEL */}
+        {showDebug && (
+            <div className="mb-6 p-4 bg-slate-800 text-slate-200 rounded-lg font-mono text-xs overflow-x-auto border border-slate-600 relative">
+                <button onClick={() => setShowDebug(false)} className="absolute top-2 right-2 text-slate-400 hover:text-white"><X size={14}/></button>
+                <h3 className="text-yellow-400 font-bold mb-2">DIAGNÓSTICO DE DATOS (Primeros 3 registros recibidos):</h3>
+                <pre>{JSON.stringify(stats.slice(0, 3), null, 2)}</pre>
+                <div className="mt-2 text-slate-400">
+                    Total registros cargados: {stats.length} <br/>
+                    Estados únicos detectados: {states.join(', ')}
+                </div>
+            </div>
+        )}
         
         <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
              {/* Estado */}
@@ -152,7 +189,7 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onSelectCommunity, isLoadi
                         disabled={states.length === 0}
                         className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none appearance-none cursor-pointer disabled:opacity-50"
                     >
-                        <option value="">{states.length === 0 && !isLoading ? "Sin datos cargados" : "Todos los Estados"}</option>
+                        <option value="">{states.length === 0 && !isLoading ? "Sin datos" : "Todos los Estados"}</option>
                         {states.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                     <ChevronRight className="w-4 h-4 text-slate-400 absolute right-3 top-3 rotate-90 pointer-events-none" />
@@ -208,15 +245,24 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onSelectCommunity, isLoadi
              </div>
         </div>
         
-        {/* Mensaje de Debug si no hay filtros */}
-        {states.length === 0 && !isLoading && stats.length > 0 && (
-             <div className="mt-4 p-3 bg-yellow-50 text-yellow-800 text-xs rounded border border-yellow-200 flex items-center gap-2">
-                 <AlertCircle size={14} />
-                 <span>
-                     <strong>Atención:</strong> Se encontraron datos de comunidades, pero no se detectaron Estados ni Municipios. 
-                     Verifique que las columnas en su hoja de cálculo se llamen exactamente 
-                     <code>ESTADO</code>, <code>MUNICIPIO</code>, <code>PARROQUIA</code> (sin espacios extra).
-                 </span>
+        {/* Mensaje de Debug si no hay filtros detectados pero hay datos */}
+        {states.length === 1 && states[0] === "Sin Información" && !isLoading && stats.length > 0 && (
+             <div className="mt-4 p-3 bg-red-50 text-red-800 text-xs rounded border border-red-200 flex flex-col gap-2">
+                 <div className="flex items-center gap-2 font-bold">
+                    <AlertCircle size={14} />
+                    <span>Error de Configuración Detectado</span>
+                 </div>
+                 <p>
+                     Los datos se están recibiendo, pero los campos <strong>ESTADO</strong> y <strong>MUNICIPIO</strong> llegan vacíos.
+                 </p>
+                 <ul className="list-disc pl-5 space-y-1">
+                     <li>
+                        <strong>Solución probable:</strong> Debe actualizar el <em>Google Apps Script</em> y <strong>desplegar una NUEVA VERSIÓN</strong>.
+                     </li>
+                     <li>
+                        Vaya a su Google Sheet {'>'} Extensiones {'>'} Apps Script {'>'} Botón azul "Implementar" {'>'} Gestionar implementaciones {'>'} Editar {'>'} Versión: <strong>Nueva versión</strong> {'>'} Implementar.
+                     </li>
+                 </ul>
              </div>
         )}
       </section>
@@ -259,9 +305,13 @@ const Dashboard: React.FC<DashboardProps> = ({ stats, onSelectCommunity, isLoadi
                                         {community.name}
                                     </h4>
                                     <div className="text-xs text-slate-500 flex flex-wrap gap-1 items-center">
-                                        <span className="bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600">{community.state || 'Estado'}</span>
+                                        <span className="bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600">
+                                            {community.state || 'Sin Estado'}
+                                        </span>
                                         <ChevronRight size={10} className="text-slate-300" />
-                                        <span className="text-slate-600">{community.municipality || 'Municipio'}</span>
+                                        <span className="text-slate-600">
+                                            {community.municipality || 'Sin Municipio'}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
