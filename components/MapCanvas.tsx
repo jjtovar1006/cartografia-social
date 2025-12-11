@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Polygon, CircleMarker, Polyline, useMapEvents, Tooltip, Popup, Marker } from 'react-leaflet';
-import { AreaRecord, LatLng } from '../types';
+import { AreaRecord, LatLng, AreaType } from '../types';
 import { wktToPoints, getPolygonCentroid } from '../utils/geoUtils';
-import { MousePointerClick, Layers, Edit3, CheckSquare, Square, Eraser, MapPin } from 'lucide-react';
+import { MousePointerClick, Layers, Edit3, CheckSquare, Square, Eraser, MapPin, Filter } from 'lucide-react';
 import L from 'leaflet';
 
 // Fix for default Leaflet marker icons in React
@@ -44,6 +44,10 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   const [showPolygons, setShowPolygons] = useState(true);
   const [showMarkers, setShowMarkers] = useState(true);
   const [showDrawing, setShowDrawing] = useState(true);
+  
+  // Filter State
+  const [selectedAreaTypes, setSelectedAreaTypes] = useState<AreaType[]>(Object.values(AreaType));
+  
   const [isLayersMenuOpen, setIsLayersMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -72,12 +76,31 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     setPoints(points.slice(0, -1));
   };
 
+  const toggleAreaType = (type: AreaType) => {
+    if (selectedAreaTypes.includes(type)) {
+      setSelectedAreaTypes(selectedAreaTypes.filter(t => t !== type));
+    } else {
+      setSelectedAreaTypes([...selectedAreaTypes, type]);
+    }
+  };
+
   const polylinePositions = points.map(p => [p.lat, p.lng] as [number, number]);
 
   // COLORES INSTITUCIONALES Y PATRIOS
   const COLOR_VINOTINTO = '#881337'; // Rose 900
   const COLOR_AMARILLO = '#eab308'; // Yellow 500
   const COLOR_AZUL = '#2563eb'; // Blue 600
+
+  // Helper to get color based on type (Optional visual distinction)
+  const getPolyColor = (type: AreaType) => {
+      if (isAdmin) return COLOR_AMARILLO;
+      switch(type) {
+          case AreaType.ZONA_AGRICOLA: return '#16a34a'; // Green
+          case AreaType.ZONA_RIESGO: return '#ea580c'; // Orange
+          case AreaType.EQUIPAMIENTO: return '#2563eb'; // Blue
+          default: return COLOR_VINOTINTO;
+      }
+  };
 
   return (
     <div className="relative h-full w-full rounded-lg overflow-hidden border border-slate-300 shadow-inner">
@@ -91,10 +114,14 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
 
         {/* 1. Render Existing Data */}
         {existingPolygons.map((poly) => {
+          // Filter logic
+          if (!selectedAreaTypes.includes(poly.TIPO_AREA)) return null;
+
           const polyPoints = wktToPoints(poly.GEOMETRIA_WKT);
           if (polyPoints.length === 0) return null;
           const centroid = getPolygonCentroid(polyPoints);
-          
+          const color = getPolyColor(poly.TIPO_AREA);
+
           return (
             <React.Fragment key={poly.ID_AREA}>
                 {/* A. POLYGONS LAYER */}
@@ -102,8 +129,8 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                     <Polygon 
                     positions={polyPoints.map(p => [p.lat, p.lng] as [number, number])}
                     pathOptions={{ 
-                        color: isAdmin ? COLOR_AMARILLO : COLOR_VINOTINTO, 
-                        fillColor: COLOR_VINOTINTO, 
+                        color: color, 
+                        fillColor: color, 
                         fillOpacity: isAdmin ? 0.4 : 0.3, 
                         weight: isAdmin ? 3 : 2
                     }}
@@ -116,7 +143,9 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                     }}
                     >
                         <Tooltip sticky direction="top" opacity={0.9}>
-                            <span className="font-bold text-rose-900">{poly.NOMBRE_AREA}</span>
+                            <span className="font-bold text-slate-900">{poly.NOMBRE_AREA}</span>
+                            <br/>
+                            <span className="text-xs text-slate-500">{poly.TIPO_AREA}</span>
                         </Tooltip>
                     </Polygon>
                 )}
@@ -201,13 +230,13 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
             <button 
                 onClick={() => setIsLayersMenuOpen(!isLayersMenuOpen)}
                 className="bg-white/90 p-2 rounded-md shadow-lg border border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors backdrop-blur-sm"
-                title="Control de Capas"
+                title="Control de Capas y Filtros"
             >
                 <Layers className="w-5 h-5" />
             </button>
             
             {isLayersMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-56 bg-white/95 backdrop-blur-md rounded-lg shadow-xl border border-slate-200 p-3 flex flex-col gap-2 animate-in fade-in zoom-in-95 duration-200">
+                <div className="absolute right-0 top-full mt-2 w-64 bg-white/95 backdrop-blur-md rounded-lg shadow-xl border border-slate-200 p-3 flex flex-col gap-2 animate-in fade-in zoom-in-95 duration-200 max-h-[80vh] overflow-y-auto">
                     <div className="flex justify-between items-center border-b border-slate-100 pb-2 mb-1">
                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Capas Visibles</span>
                     </div>
@@ -241,6 +270,39 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                              <span>Dibujo Actual</span>
                         </div>
                     </button>
+
+                    {/* NEW: Filter by Type Section */}
+                    <div className="border-t border-slate-100 my-1 pt-2">
+                        <div className="flex items-center gap-1.5 mb-2 px-1">
+                            <Filter size={12} className="text-slate-400" />
+                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Filtrar por Tipo</span>
+                        </div>
+                        
+                        <div className="space-y-0.5">
+                            {Object.values(AreaType).map((type) => (
+                                <button
+                                    key={type}
+                                    onClick={() => toggleAreaType(type)}
+                                    className="flex items-center justify-between p-1.5 w-full rounded hover:bg-slate-50 text-xs text-slate-700 transition-colors"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        {selectedAreaTypes.includes(type) ? 
+                                            <CheckSquare className="w-3.5 h-3.5 text-blue-600" /> : 
+                                            <Square className="w-3.5 h-3.5 text-slate-400" />
+                                        }
+                                        <span className="truncate text-left">{type}</span>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                         <button 
+                            onClick={() => setSelectedAreaTypes(Object.values(AreaType))}
+                            className="text-[10px] text-blue-600 hover:text-blue-800 font-medium mt-2 w-full text-center"
+                        >
+                            Seleccionar Todos
+                        </button>
+                    </div>
+
                 </div>
             )}
         </div>
