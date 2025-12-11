@@ -1,4 +1,4 @@
-import { AreaRecord, CommunityStats } from '../types';
+import { AreaRecord, CommunityStats, HouseholdRecord } from '../types';
 
 // URL del Script de Google Apps (Capa de Persistencia)
 // Esta URL se usa como respaldo si la API de Vercel no está disponible localmente o falla.
@@ -6,6 +6,7 @@ const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby-XbyZKagUuqLY
 
 // Endpoints Locales (Vercel Functions)
 const API_BASE_POLIGONO = '/api/poligono';
+const API_BASE_HOGAR = '/api/hogar';
 const API_STATS = '/api/stats';
 
 /**
@@ -101,9 +102,11 @@ const requestWithFallback = async (endpoint: string, params: Record<string, any>
              // Determinar la acción basada en el endpoint
              let action = null;
              if (endpoint.includes('stats')) action = 'stats';
-             else if (endpoint.includes('listar')) action = 'listar';
-             else if (endpoint.includes('crear')) action = 'crear';
-             else if (endpoint.includes('actualizar')) action = 'actualizar';
+             else if (endpoint.includes('poligono/listar')) action = 'listar';
+             else if (endpoint.includes('poligono/crear')) action = 'crear';
+             else if (endpoint.includes('poligono/actualizar')) action = 'actualizar';
+             else if (endpoint.includes('hogar/listar')) action = 'listar_hogares';
+             else if (endpoint.includes('hogar/crear')) action = 'registrar_hogar';
 
              if (action) {
                  const scriptMethod = method === 'GET' ? 'GET' : 'POST';
@@ -203,4 +206,38 @@ export const updateAreaInSheet = async (data: Partial<AreaRecord> & { ID_AREA: s
     console.error("Failed to update area:", error);
     throw error;
   }
+};
+
+/**
+ * Guardar nuevo hogar (Censo)
+ */
+export const saveHouseholdToSheet = async (data: HouseholdRecord): Promise<boolean> => {
+    try {
+      // Map 'ESTADO' from Typescript interface to 'ESTDO' for Google Script
+      const payload = {
+          ...data,
+          ESTDO: data.ESTADO
+      };
+      await requestWithFallback(`${API_BASE_HOGAR}/crear`, payload, 'POST');
+      return true;
+    } catch (error) {
+      console.error("Failed to save household:", error);
+      throw error;
+    }
+};
+  
+/**
+ * Listar hogares existentes
+ */
+export const fetchHouseholdsFromSheet = async (): Promise<HouseholdRecord[]> => {
+    try {
+      const data = await requestWithFallback(`${API_BASE_HOGAR}/listar`, {}, 'GET');
+      if (Array.isArray(data)) {
+        return data as HouseholdRecord[];
+      }
+      return [];
+    } catch (error) {
+      console.error("Failed to fetch households:", error);
+      return [];
+    }
 };

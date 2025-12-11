@@ -20,6 +20,22 @@ export interface AreaRecord {
   PARROQUIA?: string;
 }
 
+export interface HouseholdRecord {
+  ID_HOGAR: string;
+  FECHA_CENSO: string;
+  USUARIO_APP: string;
+  ESTADO: string;
+  MUNICIPIO: string;
+  PARROQUIA: string;
+  COMUNIDAD: string;
+  COORDENADA_LAT: number;
+  COORDENADA_LONG: number;
+  DIRECCION_REF: string;
+  NOMBRE_JEFE_FAMILIA: string;
+  NUM_MIEMBROS: number;
+  TIPO_VIVIENDA: string;
+}
+
 export interface LatLng {
   lat: number;
   lng: number;
