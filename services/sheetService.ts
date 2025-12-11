@@ -38,7 +38,14 @@ const callScriptDirectly = async (params: Record<string, any>, method: 'GET' | '
         const text = await response.text();
         // Si el script devuelve vacío, asumimos éxito en operaciones de escritura
         if (!text.trim()) return { success: true };
-        return JSON.parse(text);
+        
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            console.warn("Respuesta no-JSON del script:", text.substring(0, 50));
+            // A veces Google devuelve HTML de login o error
+            throw new Error("Respuesta inválida del script (posiblemente HTML/Login)");
+        }
     } catch (error) {
         console.error("Fallo en la llamada directa al script:", error);
         throw error;
@@ -48,7 +55,7 @@ const callScriptDirectly = async (params: Record<string, any>, method: 'GET' | '
 /**
  * Gestor de peticiones con estrategia de respaldo (Fallback).
  * 1. Intenta llamar a la API local (/api/...).
- * 2. Si falla (404 o Red), llama directamente al Google Script.
+ * 2. Si falla (404, Red, o JSON inválido), llama directamente al Google Script.
  */
 const requestWithFallback = async (endpoint: string, params: Record<string, any>, method: 'GET' | 'POST' | 'PUT' = 'GET'): Promise<any> => {
     try {
@@ -66,7 +73,6 @@ const requestWithFallback = async (endpoint: string, params: Record<string, any>
         const response = await fetch(url, options);
 
         // Si devuelve 404, es probable que estemos en local (Vite) sin backend corriendo.
-        // Lanzamos error para activar el catch y usar el fallback.
         if (response.status === 404) {
              throw new Error('API_NOT_FOUND');
         }
@@ -76,12 +82,19 @@ const requestWithFallback = async (endpoint: string, params: Record<string, any>
         }
 
         const text = await response.text();
+        // Si devuelve HTML (ej: index.html de Vite), JSON.parse fallará
         return text ? JSON.parse(text) : null;
 
     } catch (error: any) {
         // Intento 2: Fallback a Conexión Directa
-        if (error.message === 'API_NOT_FOUND' || error.name === 'TypeError') { 
-             console.log(`⚠️ API Local no disponible (${endpoint}). Conectando directamente a Google Sheets...`);
+        // Detectamos: API no encontrada (404), Error de Red (TypeError), o Respuesta HTML inválida (SyntaxError)
+        const isFallbackNeeded = 
+            error.message === 'API_NOT_FOUND' || 
+            error.name === 'TypeError' || 
+            error instanceof SyntaxError;
+
+        if (isFallbackNeeded) { 
+             console.log(`⚠️ Sincronización Local: API no disponible (${endpoint}). Conectando directo a Google Sheets...`);
              
              // Determinar la acción basada en el endpoint
              const action = endpoint.includes('stats') ? 'stats' : 
@@ -128,7 +141,7 @@ export const saveAreaToSheet = async (data: AreaRecord): Promise<boolean> => {
     await requestWithFallback(`${API_BASE_POLIGONO}/crear`, data, 'POST');
     return true;
   } catch (error) {
-    console.error("Error al guardar área:", error);
+    console.error("Failed to save area:", error);
     throw error;
   }
 };
@@ -144,7 +157,7 @@ export const fetchAreasFromSheet = async (): Promise<AreaRecord[]> => {
     }
     return [];
   } catch (error) {
-    console.error("Error al listar áreas:", error);
+    console.error("Failed to fetch areas:", error);
     return [];
   }
 };
@@ -157,7 +170,7 @@ export const updateAreaInSheet = async (data: Partial<AreaRecord> & { ID_AREA: s
     await requestWithFallback(`${API_BASE_POLIGONO}/actualizar`, data, 'PUT');
     return true;
   } catch (error) {
-    console.error("Error al actualizar área:", error);
+    console.error("Failed to update area:", error);
     throw error;
   }
 };
