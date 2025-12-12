@@ -1,6 +1,5 @@
 import { supabase } from '../lib/supabase';
 import { SectorGeografico, ViviendaRecord, CommunityStats } from '../types';
-import { pointsToWKT, wktToPoints } from '../utils/geoUtils';
 
 // ==========================================
 // SERVICIO DE SECTORES (POLÍGONOS)
@@ -16,7 +15,9 @@ export const fetchAreasFromSheet = async (): Promise<SectorGeografico[]> => {
     
     return data as SectorGeografico[];
   } catch (error: any) {
-    console.error("Error fetching areas from Supabase:", JSON.stringify(error, null, 2));
+    // Extraemos el mensaje real del error para mostrarlo en consola
+    const msg = error.message || JSON.stringify(error);
+    console.error(`Error Supabase (Areas): ${msg}`);
     return [];
   }
 };
@@ -26,9 +27,9 @@ export const saveAreaToSheet = async (data: any): Promise<boolean> => {
     const { error } = await supabase
       .from('sectores_geograficos')
       .insert([{
-        // Mapeo exacto a las columnas SQL creadas
         id_sector: data.ID_AREA,
         nombre_sector: data.NOMBRE_AREA,
+        tipo_area: data.TIPO_AREA, // Campo añadido
         estado: data.ESTADO,
         municipio: data.MUNICIPIO,
         parroquia: data.PARROQUIA,
@@ -38,7 +39,7 @@ export const saveAreaToSheet = async (data: any): Promise<boolean> => {
     if (error) throw error;
     return true;
   } catch (error: any) {
-    console.error("Error saving area:", JSON.stringify(error, null, 2));
+    console.error(`Error Guardando Area: ${error.message || JSON.stringify(error)}`);
     throw error;
   }
 };
@@ -49,6 +50,7 @@ export const updateAreaInSheet = async (data: any): Promise<boolean> => {
         .from('sectores_geograficos')
         .update({
             nombre_sector: data.NOMBRE_AREA,
+            tipo_area: data.TIPO_AREA, // Campo añadido
             estado: data.ESTADO,
             municipio: data.MUNICIPIO,
             parroquia: data.PARROQUIA,
@@ -59,7 +61,7 @@ export const updateAreaInSheet = async (data: any): Promise<boolean> => {
       if (error) throw error;
       return true;
     } catch (error: any) {
-      console.error("Error updating area:", JSON.stringify(error, null, 2));
+      console.error(`Error Actualizando Area: ${error.message || JSON.stringify(error)}`);
       throw error;
     }
   };
@@ -70,7 +72,7 @@ export const updateAreaInSheet = async (data: any): Promise<boolean> => {
 
 export const fetchHouseholdsFromSheet = async (): Promise<ViviendaRecord[]> => {
     try {
-        // JOIN entre viviendas_geoloc -> comunidad -> sectores_geograficos
+        // La consulta asume que las FK existen en Supabase
         const { data, error } = await supabase
             .from('viviendas_geoloc')
             .select(`
@@ -88,8 +90,6 @@ export const fetchHouseholdsFromSheet = async (): Promise<ViviendaRecord[]> => {
 
         if (error) throw error;
 
-        // Mapear respuesta anidada a estructura plana
-        // Nota: Si 'comunidad' o 'sectores_geograficos' es null, usamos valores por defecto
         return (data || []).map((item: any) => ({
             id_vivienda: item.id_vivienda,
             latitud: item.latitud,
@@ -101,13 +101,13 @@ export const fetchHouseholdsFromSheet = async (): Promise<ViviendaRecord[]> => {
             comunidad_asociada: item.comunidad?.sectores_geograficos?.nombre_sector || ''
         }));
     } catch (error: any) {
-        console.error("Error fetching households:", JSON.stringify(error, null, 2));
+        console.error(`Error Supabase (Hogares): ${error.message || JSON.stringify(error)}`);
         return [];
     }
 };
 
 export const saveHouseholdToSheet = async (data: any): Promise<boolean> => {
-    console.warn("La escritura de hogares requiere lógica compleja (insertar comunidad primero). Pendiente de implementar en UI.");
+    console.warn("Funcionalidad de guardar hogares pendiente de implementación en UI.");
     return true; 
 };
 
@@ -117,17 +117,17 @@ export const saveHouseholdToSheet = async (data: any): Promise<boolean> => {
 
 export const fetchCommunityStats = async (): Promise<CommunityStats[]> => {
     try {
-        // Llamada a la función RPC 'get_resumen_comunal' definida en SQL
         const { data, error } = await supabase.rpc('get_resumen_comunal');
 
         if (error) {
-             console.warn("Error calling RPC 'get_resumen_comunal':", JSON.stringify(error, null, 2));
+             // Si la función no existe o falla, retornamos array vacío sin romper la app
+             console.warn(`Error RPC Stats: ${error.message}`);
              return [];
         }
 
         return data as CommunityStats[];
     } catch (error: any) {
-        console.error("Error fetching stats:", JSON.stringify(error, null, 2));
+        console.error(`Error Fetching Stats: ${error.message}`);
         return [];
     }
 };
