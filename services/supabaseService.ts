@@ -14,9 +14,6 @@ export const fetchAreasFromSheet = async (): Promise<SectorGeografico[]> => {
 
     if (error) throw error;
     
-    // Si viene como GeoJSON binary, habría que convertirlo. 
-    // Para simplificar, asumimos que el backend devuelve WKT si usamos una vista o función,
-    // o que el cliente maneja el formato. Aquí simulamos el retorno directo.
     return data as SectorGeografico[];
   } catch (error) {
     console.error("Error fetching areas from Supabase:", error);
@@ -26,10 +23,10 @@ export const fetchAreasFromSheet = async (): Promise<SectorGeografico[]> => {
 
 export const saveAreaToSheet = async (data: any): Promise<boolean> => {
   try {
-    // Convertir a formato SQL WKT si es necesario
     const { error } = await supabase
       .from('sectores_geograficos')
       .insert([{
+        // Mapeo exacto a las columnas SQL creadas
         id_sector: data.ID_AREA,
         nombre_sector: data.NOMBRE_AREA,
         estado: data.ESTADO,
@@ -73,7 +70,7 @@ export const updateAreaInSheet = async (data: any): Promise<boolean> => {
 
 export const fetchHouseholdsFromSheet = async (): Promise<ViviendaRecord[]> => {
     try {
-        // Hacemos un JOIN con la tabla comunidad para obtener datos demográficos
+        // JOIN entre viviendas_geoloc -> comunidad -> sectores_geograficos
         const { data, error } = await supabase
             .from('viviendas_geoloc')
             .select(`
@@ -91,7 +88,7 @@ export const fetchHouseholdsFromSheet = async (): Promise<ViviendaRecord[]> => {
 
         if (error) throw error;
 
-        // Mapear respuesta compleja de Supabase a estructura plana para la App
+        // Mapear respuesta anidada a estructura plana
         return data.map((item: any) => ({
             id_vivienda: item.id_vivienda,
             latitud: item.latitud,
@@ -109,9 +106,7 @@ export const fetchHouseholdsFromSheet = async (): Promise<ViviendaRecord[]> => {
 };
 
 export const saveHouseholdToSheet = async (data: any): Promise<boolean> => {
-    // Esta función requiere insertar primero en 'comunidad' y luego en 'viviendas_geoloc'
-    // Se recomienda usar una Transacción o RPC en Supabase.
-    console.warn("Implementar lógica de guardado transaccional en Supabase");
+    console.warn("La escritura de hogares requiere lógica compleja (insertar comunidad primero). Pendiente de implementar en UI.");
     return true; 
 };
 
@@ -121,23 +116,18 @@ export const saveHouseholdToSheet = async (data: any): Promise<boolean> => {
 
 export const fetchCommunityStats = async (): Promise<CommunityStats[]> => {
     try {
-        // En una app real, usaríamos una Vista SQL o una función RPC 'get_community_stats'
-        // Simulamos la llamada a la función RPC:
+        // Llamada a la función RPC 'get_resumen_comunal' definida en SQL
         const { data, error } = await supabase.rpc('get_resumen_comunal');
 
         if (error) {
-             // Fallback si la función RPC no existe aún
-             console.warn("RPC 'get_resumen_comunal' not found, fetching raw data");
+             console.warn("Error calling RPC 'get_resumen_comunal':", error.message);
+             // Si falla (ej. tabla vacía), devolvemos array vacío para evitar crash
              return [];
         }
 
         return data as CommunityStats[];
     } catch (error) {
         console.error("Error fetching stats:", error);
-        return [
-             // Fallback visual
-            { name: "Casco Central", state: "Miranda", municipality: "Sucre", parish: "Petare", families: 45, population: 150 },
-            { name: "Sector Norte", state: "Miranda", municipality: "Sucre", parish: "Leoncio Martínez", families: 32, population: 110 }
-        ];
+        return [];
     }
 };
