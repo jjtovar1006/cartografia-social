@@ -6,34 +6,28 @@ export enum AreaType {
   OTROS = 'Otros'
 }
 
-export interface AreaRecord {
-  ID_AREA: string; // Generated via crypto.randomUUID()
-  COMUNIDAD_ASOCIADA: string;
-  TIPO_AREA: AreaType;
-  NOMBRE_AREA: string;
-  GEOMETRIA_WKT: string; // The polygon string: POLYGON((x y, x y...))
-  FECHA_ACTUALIZACION: string;
-  USUARIO_WKT: string;
-  // Nuevos campos geográficos
-  ESTADO?: string;
-  MUNICIPIO?: string;
-  PARROQUIA?: string;
+// Mapeado a la tabla: sectores_geograficos
+export interface SectorGeografico {
+  id_sector: string; 
+  nombre_sector: string;
+  estado?: string;
+  municipio?: string;
+  parroquia?: string;
+  geometria_poligono: string; // WKT o GeoJSON
+  created_at?: string;
 }
 
-export interface HouseholdRecord {
-  ID_HOGAR: string;
-  FECHA_CENSO: string;
-  USUARIO_APP: string;
-  ESTADO: string;
-  MUNICIPIO: string;
-  PARROQUIA: string;
-  COMUNIDAD: string;
-  COORDENADA_LAT: number;
-  COORDENADA_LONG: number;
-  DIRECCION_REF: string;
-  NOMBRE_JEFE_FAMILIA: string;
-  NUM_MIEMBROS: number;
-  TIPO_VIVIENDA: string;
+// Mapeado a tabla: viviendas_geoloc + comunidad
+export interface ViviendaRecord {
+  id_vivienda: string;
+  latitud: number;
+  longitud: number;
+  riesgo_deslizamiento: boolean;
+  material_paredes: string;
+  // Datos unidos de Comunidad
+  nombre_jefe?: string;
+  num_miembros?: number;
+  comunidad_asociada?: string; // Nombre del sector
 }
 
 export interface LatLng {
@@ -43,9 +37,29 @@ export interface LatLng {
 
 export interface CommunityStats {
   name: string;
-  state: string;        // Estado
-  municipality: string; // Municipio
-  parish: string;       // Parroquia
+  state: string;
+  municipality: string;
+  parish: string;
   families: number;
   population: number;
+}
+
+// Interfaces para el servicio legacy de Google Sheets
+export interface AreaRecord {
+  ID_AREA?: string;
+  COMUNIDAD_ASOCIADA?: string;
+  NOMBRE_AREA?: string;
+  TIPO_AREA?: string;
+  GEOMETRIA_WKT?: string;
+  ESTADO?: string;
+  MUNICIPIO?: string;
+  PARROQUIA?: string;
+  [key: string]: any;
+}
+
+export interface HouseholdRecord {
+  ID_HOGAR?: string;
+  COORDENADA_LAT?: number;
+  COORDENADA_LONG?: number;
+  [key: string]: any;
 }

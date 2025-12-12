@@ -1,6 +1,6 @@
 {
   "name": "social-cartography",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "engines": {
     "node": "20.x"
@@ -16,8 +16,8 @@
     "leaflet": "^1.9.4",
     "react-leaflet": "^4.2.1",
     "lucide-react": "^0.263.1",
-    "google-spreadsheet": "^4.1.4",
-    "google-auth-library": "^9.15.0"
+    "@supabase/supabase-js": "^2.39.0",
+    "wellknown": "^0.5.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

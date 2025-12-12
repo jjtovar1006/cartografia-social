@@ -2,16 +2,17 @@ import React, { useState, useEffect } from 'react';
 import MapCanvas from './components/MapCanvas';
 import AreaForm from './components/AreaForm';
 import Dashboard from './components/Dashboard';
-import { AreaRecord, AreaType, LatLng, CommunityStats, HouseholdRecord } from './types';
-import { generateUniqueId, getCurrentDateTime, pointsToWKT, wktToPoints } from './utils/geoUtils';
-import { saveAreaToSheet, fetchAreasFromSheet, fetchCommunityStats, updateAreaInSheet, fetchHouseholdsFromSheet } from './services/sheetService';
+import { SectorGeografico, AreaType, LatLng, CommunityStats, ViviendaRecord } from './types';
+import { generateUniqueId, pointsToWKT, wktToPoints } from './utils/geoUtils';
+// CAMBIO: Usamos el nuevo servicio de Supabase
+import { saveAreaToSheet, fetchAreasFromSheet, fetchCommunityStats, updateAreaInSheet, fetchHouseholdsFromSheet } from './services/supabaseService';
 import { ArrowLeft, LayoutDashboard, Lock, Unlock, ShieldCheck } from 'lucide-react';
 
 function App() {
   // Navigation & Admin State
   const [view, setView] = useState<'dashboard' | 'map'>('dashboard');
   const [selectedCommunity, setSelectedCommunity] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false); // Admin Toggle
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Application Data State
   const [communityStats, setCommunityStats] = useState<CommunityStats[]>([]);
@@ -19,16 +20,15 @@ function App() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
-  const [existingPolygons, setExistingPolygons] = useState<AreaRecord[]>([]);
-  const [households, setHouseholds] = useState<HouseholdRecord[]>([]);
+  
+  // Update Type for Supabase
+  const [existingPolygons, setExistingPolygons] = useState<SectorGeografico[]>([]);
+  const [households, setHouseholds] = useState<ViviendaRecord[]>([]);
   
   // Edit Mode State
   const [editingId, setEditingId] = useState<string | null>(null);
-  
-  // Suggested Center (Calculated from Census)
   const [suggestedCenter, setSuggestedCenter] = useState<LatLng | null>(null);
 
-  // Form State Updated with Geography
   const [formData, setFormData] = useState({
     community: '',
     name: '',
@@ -39,14 +39,12 @@ function App() {
     parish: ''
   });
 
-  // Load stats and polygons on mount
   useEffect(() => {
     loadStats();
-    loadPolygons(); // Pre-load polygons
-    loadHouseholds(); // Load census data for referencing
+    loadPolygons();
+    loadHouseholds();
   }, []);
 
-  // When community changes via dashboard, update form default and try to pre-fill geography from stats
   useEffect(() => {
     if (selectedCommunity) {
       const statMatch = communityStats.find(s => s.name === selectedCommunity);
@@ -57,8 +55,6 @@ function App() {
           municipality: statMatch?.municipality || '',
           parish: statMatch?.parish || ''
       }));
-
-      // Calculate Suggested Center based on Households
       calculateSuggestedCenter(selectedCommunity);
     } else {
         setSuggestedCenter(null);
@@ -66,8 +62,8 @@ function App() {
   }, [selectedCommunity, communityStats, households]);
 
   const calculateSuggestedCenter = (communityName: string) => {
-      // Filtrar hogares de esta comunidad
-      const communityHouseholds = households.filter(h => h.COMUNIDAD === communityName);
+      // Filtrar por 'comunidad_asociada' (nuevo campo)
+      const communityHouseholds = households.filter(h => h.comunidad_asociada === communityName);
       
       if (communityHouseholds.length > 0) {
           let latSum = 0;
@@ -75,9 +71,8 @@ function App() {
           let count = 0;
 
           communityHouseholds.forEach(h => {
-             // Asegurar que sean números válidos
-             const lat = Number(h.COORDENADA_LAT);
-             const lng = Number(h.COORDENADA_LONG);
+             const lat = Number(h.latitud);
+             const lng = Number(h.longitud);
              if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
                  latSum += lat;
                  lngSum += lng;
@@ -140,9 +135,8 @@ function App() {
   const handleReset = () => {
     setPoints([]);
     setIsDrawing(false);
-    setEditingId(null); // Exit edit mode
+    setEditingId(null);
     
-    // Reset form but keep geography if community is selected
     const statMatch = selectedCommunity ? communityStats.find(s => s.name === selectedCommunity) : null;
     
     setFormData({
@@ -156,14 +150,13 @@ function App() {
     });
   };
 
-  // Secure Admin Toggle
   const toggleAdminMode = () => {
     if (isAdmin) {
         setIsAdmin(false);
         handleReset();
     } else {
         const password = window.prompt("Ingrese la clave de Administrador (Panel de Acceso):");
-        if (password === "Apamate.25") { // Clave actualizada
+        if (password === "Apamate.25") {
             setIsAdmin(true);
             handleReset();
         } else if (password !== null) {
@@ -172,29 +165,24 @@ function App() {
     }
   };
 
-  // Triggered when clicking a polygon on the map in Admin mode
-  const handleEditPolygon = (poly: AreaRecord) => {
+  const handleEditPolygon = (poly: SectorGeografico) => {
     if (!isAdmin) return;
 
-    if (confirm(`¿Deseas editar el área "${poly.NOMBRE_AREA}"?`)) {
-        // 1. Populate Form
+    if (confirm(`¿Deseas editar el área "${poly.nombre_sector}"?`)) {
         setFormData({
-            community: poly.COMUNIDAD_ASOCIADA,
-            name: poly.NOMBRE_AREA,
-            type: poly.TIPO_AREA,
-            user: poly.USUARIO_WKT,
-            state: poly.ESTADO || '',
-            municipality: poly.MUNICIPIO || '',
-            parish: poly.PARROQUIA || ''
+            community: poly.nombre_sector, // Mapeo temporal simplificado
+            name: poly.nombre_sector,
+            type: AreaType.LIMITE_COMUNAL, // Default si no viene en DB
+            user: 'Admin',
+            state: poly.estado || '',
+            municipality: poly.municipio || '',
+            parish: poly.parroquia || ''
         });
 
-        // 2. Convert WKT to points for the map editor
-        const polyPoints = wktToPoints(poly.GEOMETRIA_WKT);
+        const polyPoints = wktToPoints(poly.geometria_poligono);
         setPoints(polyPoints);
-
-        // 3. Set State
-        setEditingId(poly.ID_AREA);
-        setIsDrawing(true); // Enable drawing mode so points are editable
+        setEditingId(poly.id_sector);
+        setIsDrawing(true);
     }
   };
 
@@ -204,52 +192,47 @@ function App() {
 
     try {
         const commonData = {
-            COMUNIDAD_ASOCIADA: formData.community,
+            COMUNIDAD_ASOCIADA: formData.community, // Legacy prop name for UI
             TIPO_AREA: formData.type,
             NOMBRE_AREA: formData.name,
             GEOMETRIA_WKT: pointsToWKT(points),
-            FECHA_ACTUALIZACION: getCurrentDateTime(),
-            USUARIO_WKT: formData.user,
             ESTADO: formData.state,
             MUNICIPIO: formData.municipality,
             PARROQUIA: formData.parish
         };
 
         if (editingId) {
-            // UPDATE EXISTING
             await updateAreaInSheet({
                 ID_AREA: editingId,
                 ...commonData
             });
-            alert('✅ Área actualizada correctamente.');
+            alert('✅ Área actualizada en Supabase.');
         } else {
-            // CREATE NEW
             await saveAreaToSheet({
                 ID_AREA: generateUniqueId(),
                 ...commonData
             });
-            alert('✅ Nueva área creada exitosamente.');
+            alert('✅ Nueva área creada en Supabase.');
         }
 
         await loadPolygons();
         handleReset();
 
     } catch (error) {
-      alert('❌ Error al guardar. Revise la consola.');
+      alert('❌ Error al guardar. Verifique conexión.');
       console.error(error);
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Filter polygons
+  // Filter polygons logic adaptation
   const filteredPolygons = existingPolygons
-    .filter(p => selectedCommunity ? p.COMUNIDAD_ASOCIADA === selectedCommunity : true)
-    .filter(p => p.ID_AREA !== editingId);
+    .filter(p => selectedCommunity ? p.nombre_sector === selectedCommunity : true)
+    .filter(p => p.id_sector !== editingId);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      {/* Header */}
       <header className="bg-white border-b border-slate-200 px-6 py-4 shadow-sm z-10 sticky top-0">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -262,7 +245,6 @@ function App() {
                   <ArrowLeft size={20} />
                 </button>
              )}
-             {/* Logo CS in Vinotinto */}
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-sm transition-colors ${isAdmin ? 'bg-yellow-500' : 'bg-rose-900'}`}>
               {isAdmin ? <ShieldCheck size={20} className="text-rose-900" /> : 'CS'}
             </div>
@@ -278,7 +260,6 @@ function App() {
           </div>
 
           <div className="flex items-center gap-4">
-             {/* Admin Toggle - Amarillo en modo activo */}
              <button
                 onClick={toggleAdminMode}
                 className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
@@ -290,7 +271,6 @@ function App() {
                 {isAdmin ? <Unlock size={14} /> : <Lock size={14} />}
                 {isAdmin ? 'Modo Editor' : 'Acceso Admin'}
              </button>
-
              {view === 'dashboard' && !isAdmin && (
                 <span className="hidden md:flex bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold border border-blue-100 items-center gap-1">
                    <LayoutDashboard size={12} /> Panel Principal
@@ -300,9 +280,7 @@ function App() {
         </div>
       </header>
 
-      {/* Main Content Area */}
       <main className="flex-1 w-full">
-        
         {view === 'dashboard' ? (
             <Dashboard 
                 stats={communityStats} 
@@ -311,7 +289,6 @@ function App() {
             />
         ) : (
             <div className="max-w-7xl mx-auto w-full p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in zoom-in duration-300">
-                {/* Left: Map Editor */}
                 <div className="lg:col-span-2 h-[500px] lg:h-[calc(100vh-140px)] rounded-xl shadow-lg border border-slate-300 bg-white overflow-hidden relative">
                 <MapCanvas 
                     points={points} 
@@ -323,8 +300,6 @@ function App() {
                     suggestedCenter={suggestedCenter}
                 />
                 </div>
-
-                {/* Right: Sidebar Form */}
                 <div className="lg:col-span-1 h-auto lg:h-[calc(100vh-140px)]">
                 <AreaForm 
                     formData={formData}
@@ -341,7 +316,6 @@ function App() {
                 </div>
             </div>
         )}
-
       </main>
     </div>
   );

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Polygon, CircleMarker, Polyline, useMapEvents, Tooltip, Popup, Marker, LayersControl } from 'react-leaflet';
-import { AreaRecord, LatLng, AreaType } from '../types';
+import { SectorGeografico, LatLng, AreaType } from '../types';
 import { wktToPoints, getPolygonCentroid } from '../utils/geoUtils';
 import { MousePointerClick, Layers, CheckSquare, Square, Eraser, MapPin, Filter } from 'lucide-react';
 import L from 'leaflet';
@@ -18,10 +18,10 @@ interface MapCanvasProps {
   points: LatLng[];
   setPoints: (points: LatLng[]) => void;
   isDrawing: boolean;
-  existingPolygons?: AreaRecord[];
-  onPolygonClick?: (poly: AreaRecord) => void;
+  existingPolygons?: SectorGeografico[]; // Updated Type
+  onPolygonClick?: (poly: SectorGeografico) => void;
   isAdmin?: boolean;
-  suggestedCenter?: LatLng | null; // Nuevo prop para centrar basado en Censo
+  suggestedCenter?: LatLng | null;
 }
 
 const ClickHandler: React.FC<{ onClick: (e: L.LeafletMouseEvent) => void }> = ({ onClick }) => {
@@ -31,7 +31,6 @@ const ClickHandler: React.FC<{ onClick: (e: L.LeafletMouseEvent) => void }> = ({
   return null;
 };
 
-// Component to handle programmatic map movement
 const MapUpdater: React.FC<{ center: LatLng | null }> = ({ center }) => {
   const map = useMapEvents({});
   useEffect(() => {
@@ -58,27 +57,20 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
   const [showMarkers, setShowMarkers] = useState(true);
   const [showDrawing, setShowDrawing] = useState(true);
   
-  // Filter State
-  const [selectedAreaTypes, setSelectedAreaTypes] = useState<AreaType[]>(Object.values(AreaType));
   const [isLayersMenuOpen, setIsLayersMenuOpen] = useState(false);
 
   useEffect(() => {
-    // Prioridad 1: Centro sugerido (Censo)
     if (suggestedCenter) {
       setCenter([suggestedCenter.lat, suggestedCenter.lng]);
       return;
     }
-
-    // Prioridad 2: Polígonos existentes
     if (existingPolygons.length > 0) {
-        const firstPoly = wktToPoints(existingPolygons[0].GEOMETRIA_WKT);
+        const firstPoly = wktToPoints(existingPolygons[0].geometria_poligono);
         if (firstPoly.length > 0) {
             setCenter([firstPoly[0].lat, firstPoly[0].lng]);
             return;
         }
     }
-
-    // Prioridad 3: Geolocalización del navegador
     if (navigator.geolocation && !suggestedCenter && existingPolygons.length === 0) {
       navigator.geolocation.getCurrentPosition((position) => {
         setCenter([position.coords.latitude, position.coords.longitude]);
@@ -95,68 +87,44 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
     setPoints(points.slice(0, -1));
   };
 
-  const toggleAreaType = (type: AreaType) => {
-    if (selectedAreaTypes.includes(type)) {
-      setSelectedAreaTypes(selectedAreaTypes.filter(t => t !== type));
-    } else {
-      setSelectedAreaTypes([...selectedAreaTypes, type]);
-    }
-  };
-
   const polylinePositions = points.map(p => [p.lat, p.lng] as [number, number]);
-
-  // COLORES INSTITUCIONALES Y PATRIOS
-  const COLOR_VINOTINTO = '#881337'; // Rose 900
-  const COLOR_AMARILLO = '#eab308'; // Yellow 500
-  const COLOR_AZUL = '#2563eb'; // Blue 600
-
-  const getPolyColor = (type: AreaType) => {
-      if (isAdmin) return COLOR_AMARILLO;
-      switch(type) {
-          case AreaType.ZONA_AGRICOLA: return '#16a34a'; // Green
-          case AreaType.ZONA_RIESGO: return '#ea580c'; // Orange
-          case AreaType.EQUIPAMIENTO: return '#2563eb'; // Blue
-          default: return COLOR_VINOTINTO;
-      }
-  };
+  
+  // Colores fijos para esta versión
+  const COLOR_VINOTINTO = '#881337'; 
+  const COLOR_AMARILLO = '#eab308';
+  const COLOR_AZUL = '#2563eb'; 
 
   return (
     <div className="relative h-full w-full rounded-lg overflow-hidden border border-slate-300 shadow-inner">
       <MapContainer center={center} zoom={13} style={{ height: '100%', width: '100%' }} zoomControl={false}>
         
-        {/* CONTROL DE CAPAS: CALLE VS SATÉLITE */}
         <LayersControl position="bottomleft">
           <LayersControl.BaseLayer checked name="Mapa Callejero">
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              attribution='&copy; OpenStreetMap'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
           </LayersControl.BaseLayer>
           <LayersControl.BaseLayer name="Vista Satelital">
             <TileLayer
-              attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+              attribution='Tiles &copy; Esri'
               url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
             />
           </LayersControl.BaseLayer>
         </LayersControl>
         
         <ClickHandler onClick={handleMapClick} />
-        
-        {/* Componente auxiliar para animar el vuelo al centro sugerido */}
         <MapUpdater center={suggestedCenter} />
 
-        {/* 1. Render Existing Data */}
+        {/* 1. Render Existing Data (From Supabase) */}
         {existingPolygons.map((poly) => {
-          if (!selectedAreaTypes.includes(poly.TIPO_AREA)) return null;
-
-          const polyPoints = wktToPoints(poly.GEOMETRIA_WKT);
+          const polyPoints = wktToPoints(poly.geometria_poligono);
           if (polyPoints.length === 0) return null;
           const centroid = getPolygonCentroid(polyPoints);
-          const color = getPolyColor(poly.TIPO_AREA);
+          const color = COLOR_VINOTINTO; 
 
           return (
-            <React.Fragment key={poly.ID_AREA}>
-                {/* A. POLYGONS LAYER */}
+            <React.Fragment key={poly.id_sector}>
                 {showPolygons && (
                     <Polygon 
                     positions={polyPoints.map(p => [p.lat, p.lng] as [number, number])}
@@ -175,29 +143,23 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
                     }}
                     >
                         <Tooltip sticky direction="top" opacity={0.9}>
-                            <span className="font-bold text-slate-900">{poly.NOMBRE_AREA}</span>
-                            <br/>
-                            <span className="text-xs text-slate-500">{poly.TIPO_AREA}</span>
+                            <span className="font-bold text-slate-900">{poly.nombre_sector}</span>
                         </Tooltip>
                     </Polygon>
                 )}
 
-                {/* B. MARKERS LAYER (Points of Coordinates per Community) */}
                 {showMarkers && centroid && !isDrawing && (
                     <Marker position={[centroid.lat, centroid.lng]}>
                         <Popup>
                             <div className="text-sm min-w-[150px] p-1">
                                 <div className="flex items-center gap-2 mb-2 border-b border-rose-100 pb-2">
                                     <MapPin size={16} className="text-rose-800" />
-                                    <strong className="block text-rose-900 text-base">{poly.NOMBRE_AREA}</strong>
+                                    <strong className="block text-rose-900 text-base">{poly.nombre_sector}</strong>
                                 </div>
                                 <span className="inline-block bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full mb-2 font-medium border border-blue-100">
-                                    {poly.TIPO_AREA}
+                                    Límite Comunal
                                 </span>
                                 <div className="space-y-1">
-                                    <div className="text-xs text-slate-500">
-                                        <span className="font-semibold text-slate-700">Comunidad:</span> {poly.COMUNIDAD_ASOCIADA}
-                                    </div>
                                     <div className="text-xs text-slate-500 font-mono bg-slate-50 p-1.5 rounded border border-slate-100 flex items-center justify-between">
                                         <span>Lat: {centroid.lat.toFixed(5)}</span>
                                         <span>Lng: {centroid.lng.toFixed(5)}</span>
@@ -211,17 +173,15 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
           );
         })}
 
-        {/* 2. Render Current Drawing (AZUL) */}
+        {/* 2. Render Current Drawing */}
         {showDrawing && (
             <>
                 {points.length > 0 && points.length < 3 && (
                   <Polyline positions={polylinePositions} color={COLOR_AZUL} dashArray="5, 10" />
                 )}
-
                 {points.length >= 3 && (
                   <Polygon positions={polylinePositions} color={COLOR_AZUL} fillColor={COLOR_AZUL} fillOpacity={0.2} />
                 )}
-
                 {points.map((p, idx) => (
                   <CircleMarker 
                     key={`${p.lat}-${p.lng}-${idx}`} 
@@ -233,24 +193,20 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
             </>
         )}
 
-        {/* 3. Render Suggested Center Marker (Censo) if drawing new area */}
         {suggestedCenter && isDrawing && points.length === 0 && (
            <Marker position={[suggestedCenter.lat, suggestedCenter.lng]} opacity={0.7}>
               <Popup>
                 <div className="text-center">
-                   <strong>Punto de Referencia (Censo)</strong><br/>
-                   Comience a dibujar cerca de aquí.
+                   <strong>Referencia</strong><br/>
+                   Comience a dibujar aquí.
                 </div>
               </Popup>
            </Marker>
         )}
-
       </MapContainer>
 
       {/* Floating Controls */}
       <div className="absolute top-4 right-4 z-[1000] flex flex-col items-end gap-2">
-        
-        {/* Status Badge */}
         <div className={`p-2 rounded-md shadow-lg border text-xs font-medium flex items-center gap-2 backdrop-blur-sm ${
             isDrawing ? 'bg-blue-50/90 border-blue-200 text-blue-800' : 'bg-white/90 border-slate-200 text-slate-600'
         }`}>
@@ -262,99 +218,50 @@ const MapCanvas: React.FC<MapCanvasProps> = ({
            ) : (
              <>
                <Layers className="w-4 h-4 text-rose-800" />
-               {existingPolygons.length} áreas cargadas
+               {existingPolygons.length} sectores
              </>
            )}
         </div>
 
-        {/* Layer Control */}
         <div className="relative">
             <button 
                 onClick={() => setIsLayersMenuOpen(!isLayersMenuOpen)}
                 className="bg-white/90 p-2 rounded-md shadow-lg border border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors backdrop-blur-sm"
-                title="Control de Capas y Filtros"
             >
                 <Layers className="w-5 h-5" />
             </button>
             
             {isLayersMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-64 bg-white/95 backdrop-blur-md rounded-lg shadow-xl border border-slate-200 p-3 flex flex-col gap-2 animate-in fade-in zoom-in-95 duration-200 max-h-[80vh] overflow-y-auto">
-                    <div className="flex justify-between items-center border-b border-slate-100 pb-2 mb-1">
-                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Capas Visibles</span>
-                    </div>
-                    
+                <div className="absolute right-0 top-full mt-2 w-64 bg-white/95 backdrop-blur-md rounded-lg shadow-xl border border-slate-200 p-3 flex flex-col gap-2">
                     <button 
                         onClick={() => setShowPolygons(!showPolygons)}
-                        className="flex items-center justify-between p-2 rounded hover:bg-slate-50 text-sm text-slate-700 transition-colors"
+                        className="flex items-center gap-2 p-2 hover:bg-slate-50 text-sm"
                     >
-                        <div className="flex items-center gap-2">
-                             {showPolygons ? <CheckSquare className="w-4 h-4 text-rose-800" /> : <Square className="w-4 h-4 text-slate-400" />}
-                             <span>Polígonos (Áreas)</span>
-                        </div>
+                        {showPolygons ? <CheckSquare className="text-rose-800" size={16}/> : <Square size={16}/>}
+                        Polígonos
                     </button>
-
                     <button 
                         onClick={() => setShowMarkers(!showMarkers)}
-                        className="flex items-center justify-between p-2 rounded hover:bg-slate-50 text-sm text-slate-700 transition-colors"
+                        className="flex items-center gap-2 p-2 hover:bg-slate-50 text-sm"
                     >
-                        <div className="flex items-center gap-2">
-                             {showMarkers ? <CheckSquare className="w-4 h-4 text-rose-800" /> : <Square className="w-4 h-4 text-slate-400" />}
-                             <span>Puntos (Coordenadas)</span>
-                        </div>
+                        {showMarkers ? <CheckSquare className="text-rose-800" size={16}/> : <Square size={16}/>}
+                        Marcadores
                     </button>
-
                     <button 
                         onClick={() => setShowDrawing(!showDrawing)}
-                        className="flex items-center justify-between p-2 rounded hover:bg-slate-50 text-sm text-slate-700 transition-colors"
+                        className="flex items-center gap-2 p-2 hover:bg-slate-50 text-sm"
                     >
-                         <div className="flex items-center gap-2">
-                             {showDrawing ? <CheckSquare className="w-4 h-4 text-blue-600" /> : <Square className="w-4 h-4 text-slate-400" />}
-                             <span>Dibujo Actual</span>
-                        </div>
+                        {showDrawing ? <CheckSquare className="text-blue-600" size={16}/> : <Square size={16}/>}
+                        Dibujo Actual
                     </button>
-
-                    {/* Filter by Type Section */}
-                    <div className="border-t border-slate-100 my-1 pt-2">
-                        <div className="flex items-center gap-1.5 mb-2 px-1">
-                            <Filter size={12} className="text-slate-400" />
-                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Filtrar por Tipo</span>
-                        </div>
-                        
-                        <div className="space-y-0.5">
-                            {Object.values(AreaType).map((type) => (
-                                <button
-                                    key={type}
-                                    onClick={() => toggleAreaType(type)}
-                                    className="flex items-center justify-between p-1.5 w-full rounded hover:bg-slate-50 text-xs text-slate-700 transition-colors"
-                                >
-                                    <div className="flex items-center gap-2">
-                                        {selectedAreaTypes.includes(type) ? 
-                                            <CheckSquare className="w-3.5 h-3.5 text-blue-600" /> : 
-                                            <Square className="w-3.5 h-3.5 text-slate-400" />
-                                        }
-                                        <span className="truncate text-left">{type}</span>
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                         <button 
-                            onClick={() => setSelectedAreaTypes(Object.values(AreaType))}
-                            className="text-[10px] text-blue-600 hover:text-blue-800 font-medium mt-2 w-full text-center"
-                        >
-                            Seleccionar Todos
-                        </button>
-                    </div>
-
                 </div>
             )}
         </div>
 
-        {/* Eraser Tool */}
         {points.length > 0 && isDrawing && showDrawing && (
           <button 
             onClick={removeLastPoint}
             className="bg-white hover:bg-red-50 text-red-600 p-2 rounded-md shadow-lg border border-slate-200 flex items-center justify-center transition-colors"
-            title="Borrar último punto"
           >
             <Eraser className="w-5 h-5" />
           </button>
