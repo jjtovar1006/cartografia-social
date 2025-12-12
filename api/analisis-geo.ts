@@ -1,18 +1,24 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
-// Cliente Supabase del lado del servidor (Service Role para permisos elevados si necesario)
-const supabaseUrl = process.env.VITE_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // BLOQUE 3: API DE CONEXIÓN
-  // Recibe token y polígono GeoJSON
   
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  // Safe environment access for Vercel Function (Node.js)
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+  
+  if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("Missing Supabase Environment Variables in Server Function");
+      return res.status(500).json({ error: "Server Configuration Error: Missing Database Credentials" });
+  }
+
+  // Cliente Supabase del lado del servidor (Service Role)
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
     const { token, polygon_geojson } = req.body;
@@ -27,26 +33,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { data, error } = await supabase.rpc('analisis_territorial_agregado', { 
         geo_input: polygon_geojson 
     });
-
-    /**
-     * NOTA: Debes crear esta función en Supabase SQL Editor:
-     * 
-     * CREATE OR REPLACE FUNCTION analisis_territorial_agregado(geo_input JSONB)
-     * RETURNS TABLE(total_viviendas BIGINT, poblacion_estimada BIGINT) AS $$
-     * BEGIN
-     *   RETURN QUERY
-     *   SELECT 
-     *     COUNT(v.id_vivienda),
-     *     SUM(c.num_miembros)
-     *   FROM viviendas_geoloc v
-     *   JOIN comunidad c ON v.id_propietario = c.id_persona
-     *   WHERE ST_Contains(
-     *     ST_GeomFromGeoJSON(geo_input), 
-     *     v.geog
-     *   );
-     * END;
-     * $$ LANGUAGE plpgsql;
-     */
 
     if (error) throw error;
 
