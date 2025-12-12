@@ -15,8 +15,8 @@ export const fetchAreasFromSheet = async (): Promise<SectorGeografico[]> => {
     if (error) throw error;
     
     return data as SectorGeografico[];
-  } catch (error) {
-    console.error("Error fetching areas from Supabase:", error);
+  } catch (error: any) {
+    console.error("Error fetching areas from Supabase:", JSON.stringify(error, null, 2));
     return [];
   }
 };
@@ -37,8 +37,8 @@ export const saveAreaToSheet = async (data: any): Promise<boolean> => {
 
     if (error) throw error;
     return true;
-  } catch (error) {
-    console.error("Error saving area:", error);
+  } catch (error: any) {
+    console.error("Error saving area:", JSON.stringify(error, null, 2));
     throw error;
   }
 };
@@ -58,8 +58,8 @@ export const updateAreaInSheet = async (data: any): Promise<boolean> => {
   
       if (error) throw error;
       return true;
-    } catch (error) {
-      console.error("Error updating area:", error);
+    } catch (error: any) {
+      console.error("Error updating area:", JSON.stringify(error, null, 2));
       throw error;
     }
   };
@@ -89,7 +89,8 @@ export const fetchHouseholdsFromSheet = async (): Promise<ViviendaRecord[]> => {
         if (error) throw error;
 
         // Mapear respuesta anidada a estructura plana
-        return data.map((item: any) => ({
+        // Nota: Si 'comunidad' o 'sectores_geograficos' es null, usamos valores por defecto
+        return (data || []).map((item: any) => ({
             id_vivienda: item.id_vivienda,
             latitud: item.latitud,
             longitud: item.longitud,
@@ -99,8 +100,8 @@ export const fetchHouseholdsFromSheet = async (): Promise<ViviendaRecord[]> => {
             num_miembros: item.comunidad?.num_miembros || 0,
             comunidad_asociada: item.comunidad?.sectores_geograficos?.nombre_sector || ''
         }));
-    } catch (error) {
-        console.error("Error fetching households:", error);
+    } catch (error: any) {
+        console.error("Error fetching households:", JSON.stringify(error, null, 2));
         return [];
     }
 };
@@ -120,14 +121,13 @@ export const fetchCommunityStats = async (): Promise<CommunityStats[]> => {
         const { data, error } = await supabase.rpc('get_resumen_comunal');
 
         if (error) {
-             console.warn("Error calling RPC 'get_resumen_comunal':", error.message);
-             // Si falla (ej. tabla vacía), devolvemos array vacío para evitar crash
+             console.warn("Error calling RPC 'get_resumen_comunal':", JSON.stringify(error, null, 2));
              return [];
         }
 
         return data as CommunityStats[];
-    } catch (error) {
-        console.error("Error fetching stats:", error);
+    } catch (error: any) {
+        console.error("Error fetching stats:", JSON.stringify(error, null, 2));
         return [];
     }
 };
