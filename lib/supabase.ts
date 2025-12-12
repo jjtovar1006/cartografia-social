@@ -1,42 +1,38 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Robust environment variable retrieval for Vite/Vercel/Node environments
-const getEnv = (keys: string[]) => {
-  // 1. Try import.meta.env (Vite client)
-  try {
-    // @ts-ignore
-    if (typeof import.meta !== 'undefined' && import.meta.env) {
-      for (const key of keys) {
-        // @ts-ignore
-        if (import.meta.env[key]) return import.meta.env[key];
-      }
+// Helper to get env vars safely across environments (Vite, Next, Node)
+const getEnvVar = (keys: string[]): string => {
+  // 1. Try import.meta.env (Vite)
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    for (const key of keys) {
+      // @ts-ignore
+      const val = import.meta.env[key];
+      if (val) return val;
     }
-  } catch (e) {}
+  }
 
-  // 2. Try process.env (Node/Vercel/Polyfilled)
-  try {
-    // @ts-ignore
-    if (typeof process !== 'undefined' && process.env) {
-      for (const key of keys) {
-        // @ts-ignore
-        if (process.env[key]) return process.env[key];
-      }
+  // 2. Try process.env (Node/System/Webpack)
+  if (typeof process !== 'undefined' && process.env) {
+    for (const key of keys) {
+      const val = process.env[key];
+      if (val) return val;
     }
-  } catch (e) {}
+  }
 
   return '';
 };
 
-// Search for VITE (standard), NEXT_PUBLIC (Vercel/Next), or plain (Node) keys
-const supabaseUrl = getEnv(['VITE_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_URL']);
-const supabaseAnonKey = getEnv(['VITE_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_ANON_KEY']);
+// Keys to search for
+const URL_KEYS = ['VITE_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_URL'];
+const KEY_KEYS = ['VITE_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_ANON_KEY'];
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn("⚠️ Supabase credentials missing. Check environment variables.");
-  console.warn("Looking for VITE_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_URL, or SUPABASE_URL");
-}
+const supabaseUrl = getEnvVar(URL_KEYS);
+const supabaseAnonKey = getEnvVar(KEY_KEYS);
 
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co', 
-  supabaseAnonKey || 'placeholder-key'
-);
+// Fallback to avoid build crash if vars are missing during build time
+const finalUrl = supabaseUrl || 'https://placeholder.supabase.co';
+const finalKey = supabaseAnonKey || 'placeholder-key';
+
+if (!supabaseUrl) console.warn('⚠️ Supabase URL not found in environment variables');
+
+export const supabase = createClient(finalUrl, finalKey);
