@@ -6,7 +6,7 @@ import { SectorGeografico, AreaType, LatLng, CommunityStats, ViviendaRecord } fr
 import { generateUniqueId, pointsToWKT, wktToPoints } from './utils/geoUtils';
 // CAMBIO: Usamos el nuevo servicio de Supabase
 import { saveAreaToSheet, fetchAreasFromSheet, fetchCommunityStats, updateAreaInSheet, fetchHouseholdsFromSheet } from './services/supabaseService';
-import { ArrowLeft, LayoutDashboard, Lock, Unlock, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, Lock, Unlock, ShieldCheck, Map as MapIcon } from 'lucide-react';
 
 function App() {
   // Navigation & Admin State
@@ -246,15 +246,15 @@ function App() {
                 </button>
              )}
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-sm transition-colors ${isAdmin ? 'bg-yellow-500' : 'bg-rose-900'}`}>
-              {isAdmin ? <ShieldCheck size={20} className="text-rose-900" /> : 'CS'}
+              {isAdmin ? <ShieldCheck size={20} className="text-rose-900" /> : <MapIcon size={20} />}
             </div>
             <div>
               <h1 className="text-xl font-bold text-slate-800 hidden sm:block">
                   {isAdmin ? 'Panel de Administración' : 'Cartografía Social'}
               </h1>
-              <h1 className="text-xl font-bold text-slate-800 sm:hidden">Gobierno Digital</h1>
+              <h1 className="text-xl font-bold text-slate-800 sm:hidden">Cartografía Social</h1>
               <p className="text-xs text-slate-500 font-medium tracking-wide uppercase">
-                {view === 'map' && selectedCommunity ? selectedCommunity : 'Gobierno Digital Comunitario'}
+                {view === 'map' && selectedCommunity ? selectedCommunity : 'Gobierno Digital • Consejos Comunales'}
               </p>
             </div>
           </div>

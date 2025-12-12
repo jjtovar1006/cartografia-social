@@ -9,11 +9,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Safe environment access for Vercel Function (Node.js)
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+  // We explicitly check for the specific project prefix 'cartografia_' as well as standard keys
+  const supabaseUrl = process.env.SUPABASE_URL || 
+                      process.env.VITE_SUPABASE_URL || 
+                      process.env.NEXT_PUBLIC_SUPABASE_URL || 
+                      process.env.cartografia_SUPABASE_URL;
+
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 
+                             process.env.SUPABASE_SECRET_KEY || 
+                             process.env.cartografia_SUPABASE_SERVICE_ROLE_KEY ||
+                             process.env.cartografia_SUPABASE_SECRET_KEY;
   
   if (!supabaseUrl || !supabaseServiceKey) {
       console.error("Missing Supabase Environment Variables in Server Function");
+      console.error("Available Keys:", Object.keys(process.env).filter(k => k.includes('SUPABASE')));
       return res.status(500).json({ error: "Server Configuration Error: Missing Database Credentials" });
   }
 

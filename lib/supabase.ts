@@ -22,9 +22,19 @@ const getEnvVar = (keys: string[]): string => {
   return '';
 };
 
-// Keys to search for
-const URL_KEYS = ['VITE_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_URL'];
-const KEY_KEYS = ['VITE_SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_ANON_KEY'];
+// Keys to search for (Ordered by priority)
+const URL_KEYS = [
+  'VITE_SUPABASE_URL', 
+  'NEXT_PUBLIC_SUPABASE_URL', 
+  'cartografia_SUPABASE_URL', 
+  'SUPABASE_URL'
+];
+const KEY_KEYS = [
+  'VITE_SUPABASE_ANON_KEY', 
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY', 
+  'cartografia_SUPABASE_ANON_KEY', 
+  'SUPABASE_ANON_KEY'
+];
 
 const supabaseUrl = getEnvVar(URL_KEYS);
 const supabaseAnonKey = getEnvVar(KEY_KEYS);
@@ -33,6 +43,6 @@ const supabaseAnonKey = getEnvVar(KEY_KEYS);
 const finalUrl = supabaseUrl || 'https://placeholder.supabase.co';
 const finalKey = supabaseAnonKey || 'placeholder-key';
 
-if (!supabaseUrl) console.warn('⚠️ Supabase URL not found in environment variables');
+if (!supabaseUrl) console.warn('⚠️ Supabase URL not found in environment variables. Checked: ', URL_KEYS.join(', '));
 
 export const supabase = createClient(finalUrl, finalKey);
