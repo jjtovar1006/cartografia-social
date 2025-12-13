@@ -72,7 +72,7 @@ export const updateAreaInSheet = async (data: any): Promise<boolean> => {
 
 export const fetchHouseholdsFromSheet = async (): Promise<ViviendaRecord[]> => {
     try {
-        // La consulta asume que las FK existen en Supabase
+        // CORRECCIÓN: La tabla comunidad tiene 'nombre' y 'apellido', no 'nombre_completo'.
         const { data, error } = await supabase
             .from('viviendas_geoloc')
             .select(`
@@ -82,8 +82,8 @@ export const fetchHouseholdsFromSheet = async (): Promise<ViviendaRecord[]> => {
                 material_paredes,
                 riesgo_deslizamiento,
                 comunidad (
-                    nombre_completo,
-                    num_miembros,
+                    nombre,
+                    apellido,
                     sectores_geograficos ( nombre_sector )
                 )
             `);
@@ -96,8 +96,12 @@ export const fetchHouseholdsFromSheet = async (): Promise<ViviendaRecord[]> => {
             longitud: item.longitud,
             material_paredes: item.material_paredes,
             riesgo_deslizamiento: item.riesgo_deslizamiento,
-            nombre_jefe: item.comunidad?.nombre_completo || 'Desconocido',
-            num_miembros: item.comunidad?.num_miembros || 0,
+            // Concatenamos el nombre manualmente
+            nombre_jefe: item.comunidad 
+                ? `${item.comunidad.nombre || ''} ${item.comunidad.apellido || ''}`.trim() 
+                : 'Desconocido',
+            // Asignamos 0 porque num_miembros no parece estar en la tabla comunidad actual
+            num_miembros: 0,
             comunidad_asociada: item.comunidad?.sectores_geograficos?.nombre_sector || ''
         }));
     } catch (error: any) {
@@ -120,7 +124,6 @@ export const fetchCommunityStats = async (): Promise<CommunityStats[]> => {
         const { data, error } = await supabase.rpc('get_resumen_comunal');
 
         if (error) {
-             // Si la función no existe o falla, retornamos array vacío sin romper la app
              console.warn(`Error RPC Stats: ${error.message}`);
              return [];
         }
